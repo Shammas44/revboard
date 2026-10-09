@@ -148,7 +148,7 @@ working directory.
 | Area | What you can do |
 |---|---|
 | **Dashboard** (`/`) | All projects and sessions with progress, open, archive, delete |
-| **Toolbar** | Session name (hover → pencil or double-click to **rename**) and git command, overall progress (hunks, files, attention, excluded), **Unified / Split** diff switch, *Collapse reviewed* toggle, **excluded files**, **commits**, session notes, **refresh** (re-runs git), shortcut help |
+| **Toolbar** | Session name (hover → pencil or double-click to **rename**) and git command, overall progress (hunks, files, attention, excluded), **Unified / Split** diff switch, **Colors / Collapse reviewed** view options, **excluded files**, **commits**, session notes, **refresh** (re-runs git), shortcut help |
 | **File tree** | Search, filter (to review / needs attention / reviewed / pinned / with notes / excluded), pinned section, per-folder progress. Hover a folder to mark all of its files reviewed, reset them, or **exclude the folder** |
 | **Diff** | Unified or side-by-side. Per-file actions (Reviewed, Needs attention, Reset, Pin, Note, **History**, **Exclude**), per-hunk actions in each hunk header, click a **line number** to add a note on that line |
 | **Dashboard** | Open, **rename**, archive or delete any session |
@@ -203,7 +203,7 @@ line number. `c` adds a note on the
 whole file, and the *Notes* drawer (`N`) holds the session notes.
 
 The *Notes* drawer also lists **every note of the review**, grouped by file. Each line note is
-shown with an excerpt of its hunk, the noted line highlighted. *Go to line* opens the file,
+shown with its whole hunk, scrolled to the noted line, which is marked. *Go to line* opens the file,
 expands the hunk if it was collapsed, scrolls to the line and highlights it. A filter box searches
 note texts and paths. Notes whose line disappeared after a refresh are marked *outdated*.
 
@@ -211,6 +211,7 @@ From the terminal:
 
 ```bash
 revboard review notes                       # plain text, noted lines marked with ">"
+revboard review notes --context 0           # whole hunks instead of 3 lines around the note
 revboard review notes --markdown > notes.md # paste into a pull request
 ```
 

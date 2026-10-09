@@ -64,7 +64,7 @@ database and serves a local web UI to work through it, across days and across pr
 | FR-14 | A session has **exclusion rules** (gitignore-like patterns, §8.5). Excluded files are hidden from the tree and the navigation and are not counted in the progress; their statuses, pins and notes are kept. Rules are managed with `revboard review exclude`, the toolbar dialog, or the "exclude" actions of a file or folder. |
 | FR-15 | The commits covered by a session (and the commits touching one file) can be inspected: hash, author, date, message, changed files. They are read live from git (§8.6). |
 | FR-16 | The diff can be displayed **unified** or **split** (side by side); the choice is persisted per session. |
-| FR-17 | All notes can be retrieved in one place (UI *Notes* drawer, `revboard review notes [--markdown]`), each line note with an excerpt of its hunk (±3 lines) where the noted line is highlighted; "go to line" opens the file, expands the hunk and highlights the line in the diff. |
+| FR-17 | All notes can be retrieved in one place (UI *Notes* drawer, `revboard review notes [--markdown]`), each line note with its whole hunk (scrolled to the noted line, which is marked; the CLI prints `--context` lines around it, default 3); "go to line" opens the file, expands the hunk and highlights the line in the diff. |
 
 ## 5. Non-functional requirements
 
@@ -674,7 +674,7 @@ Base: `http://127.0.0.1:<port>/api`. JSON in/out. All requests require header
 | DELETE | `/api/sessions/{id}` | — | 204 | |
 | POST | `/api/sessions/{id}/refresh` | — | `SessionDetail` | re-runs git (§8.4) |
 | POST | `/api/sessions/{id}/status` | `{fileIds: number[], status}` | `StatusChange` | bulk (folder) |
-| GET | `/api/sessions/{id}/notes` | — | `NoteContext[]` | every note in diff order; line notes carry `fileId`, `hunkId`, `hunkHeader`, `excerpt` (±3 lines, `focus` on the noted line) or `outdated` |
+| GET | `/api/sessions/{id}/notes` | — | `NoteContext[]` | every note in diff order; line notes carry `fileId`, `hunkId`, `hunkHeader`, `hunkSection`, `excerpt` (all hunk lines, `focus` on the noted line) or `outdated` |
 | GET | `/api/sessions/{id}/commits?path=` | — | `CommitList` | live `git log` of the session range (§8.6), optionally for one file |
 | GET | `/api/sessions/{id}/comments` | — | `Comment[]` | all notes of the session |
 | POST | `/api/sessions/{id}/comments` | `{filePath, side, line, body}` | `Comment` | |

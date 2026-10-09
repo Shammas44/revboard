@@ -8,10 +8,7 @@ import (
 	"revboard/internal/diff"
 )
 
-// ExcerptRadius is the number of diff lines shown before and after a noted line.
-const ExcerptRadius = 3
-
-// ExcerptLine is a diff line of a note excerpt; Focus marks the noted line.
+// ExcerptLine is a line of the hunk of a note; Focus marks the noted line.
 type ExcerptLine struct {
 	diff.Line
 	Focus bool `json:"focus"`
@@ -25,18 +22,21 @@ type NoteContext struct {
 	FileID     int64  `json:"fileId"`
 	FileStatus Status `json:"fileStatus,omitempty"`
 	Excluded   bool   `json:"excluded"`
-	// HunkID and HunkHeader identify the hunk containing a line note.
-	HunkID     int64         `json:"hunkId"`
-	HunkHeader string        `json:"hunkHeader"`
-	Excerpt    []ExcerptLine `json:"excerpt"`
+	// HunkID, HunkHeader and HunkSection identify the hunk containing a line note;
+	// Excerpt holds all of its lines.
+	HunkID      int64         `json:"hunkId"`
+	HunkHeader  string        `json:"hunkHeader"`
+	HunkSection string        `json:"hunkSection"`
+	Excerpt     []ExcerptLine `json:"excerpt"`
 	// Outdated is set for line notes whose line is not part of the diff anymore.
 	Outdated bool `json:"outdated"`
 }
 
 type noteHunk struct {
-	id     int64
-	header string
-	lines  []diff.Line
+	id      int64
+	header  string
+	section string
+	lines   []diff.Line
 }
 
 // ListNotesWithContext returns all notes of a session: session notes first, then
@@ -84,10 +84,9 @@ func (s *Store) ListNotesWithContext(ctx context.Context, sessionID int64) ([]No
 			for _, h := range hunks[n.FileID] {
 				if i := findLine(h.lines, c.Side, c.Line); i >= 0 {
 					n.Outdated = false
-					n.HunkID, n.HunkHeader = h.id, h.header
-					from, to := max(0, i-ExcerptRadius), min(len(h.lines), i+ExcerptRadius+1)
-					for j := from; j < to; j++ {
-						n.Excerpt = append(n.Excerpt, ExcerptLine{Line: h.lines[j], Focus: j == i})
+					n.HunkID, n.HunkHeader, n.HunkSection = h.id, h.header, h.section
+					for j, l := range h.lines {
+						n.Excerpt = append(n.Excerpt, ExcerptLine{Line: l, Focus: j == i})
 					}
 					break
 				}
@@ -132,14 +131,11 @@ func loadNoteHunks(ctx context.Context, s *Store, fileID int64) ([]noteHunk, err
 	for rows.Next() {
 		var h noteHunk
 		var oldStart, oldLines, newStart, newLines int
-		var section, body string
-		if err := rows.Scan(&h.id, &oldStart, &oldLines, &newStart, &newLines, &section, &body); err != nil {
+		var body string
+		if err := rows.Scan(&h.id, &oldStart, &oldLines, &newStart, &newLines, &h.section, &body); err != nil {
 			return nil, err
 		}
 		h.header = fmt.Sprintf("@@ -%d,%d +%d,%d @@", oldStart, oldLines, newStart, newLines)
-		if section != "" {
-			h.header += " " + section
-		}
 		h.lines = diff.ParseHunkBody(oldStart, newStart, body)
 		out = append(out, h)
 	}

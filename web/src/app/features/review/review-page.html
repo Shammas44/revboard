@@ -64,18 +64,17 @@
         pTooltip="Diff view (v)"
         tooltipPosition="left"
       />
-      <p-button
-        icon="pi pi-palette"
-        [text]="!store.syntaxHighlight()"
-        [severity]="store.syntaxHighlight() ? 'info' : 'secondary'"
-        (onClick)="store.syntaxHighlight.update((v) => !v)"
-        pTooltip="Syntax colors (h)"
+      <p-selectbutton
+        [options]="viewOptions"
+        optionLabel="label"
+        optionValue="value"
+        [multiple]="true"
+        size="small"
+        [ngModel]="viewFlags()"
+        (ngModelChange)="setViewFlags($event)"
+        pTooltip="Colors (h) · Collapse (z)"
         tooltipPosition="left"
       />
-      <label class="collapse-toggle small" pTooltip="Collapse reviewed (z)" tooltipPosition="left">
-        <p-toggleswitch [ngModel]="store.collapseReviewed()" (ngModelChange)="store.collapseReviewed.set($event)" />
-        Collapse reviewed
-      </label>
       <p-button
         icon="pi pi-filter-slash"
         [text]="true"

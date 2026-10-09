@@ -10,7 +10,7 @@ import { ReviewStore } from '../../core/review-store';
   selector: 'grb-exclusions-dialog',
   imports: [FormsModule, Button, Dialog, InputText],
   template: `
-    <p-dialog header="Excluded files" [visible]="visible()" (visibleChange)="visible.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '60rem', maxWidth: '95vw' }">
+    <p-dialog header="Excluded files" [visible]="visible()" (visibleChange)="visible.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '60rem', maxWidth: '95vw', height: '80vh' }" [contentStyle]="{ display: 'flex', flexDirection: 'column', flex: '1', minHeight: '0' }">
       <p class="muted small help">
         Excluded files are hidden from the tree and do not count in the progress. Their statuses and notes are kept.
         Rules: <code>*.md</code> (name at any depth), <code>docs/</code> (folder), <code>src/gen/</code> (path from root),
@@ -85,6 +85,10 @@ import { ReviewStore } from '../../core/review-store';
       list-style: none;
       padding: 0;
       margin: 1rem 0 0.75rem;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      border-top: 1px solid var(--p-content-border-color);
       .rule {
         overflow-wrap: anywhere;
         min-width: 0;

@@ -527,6 +527,23 @@ export class ReviewStore {
     });
   }
 
+  /**
+   * Turns "collapse reviewed hunks" on or off. The line highlighted by "go to
+   * line" stops forcing its hunk open, so collapsing applies everywhere.
+   */
+  setCollapseReviewed(value: boolean): void {
+    this.focusLine.set(null);
+    this.collapseReviewed.set(value);
+  }
+
+  /** A status change on the focused hunk ends its forced expansion. */
+  private releaseFocus(hunkIds: readonly number[]): void {
+    const f = this.focusLine();
+    if (f && hunkIds.includes(f.hunkId)) {
+      this.focusLine.set(null);
+    }
+  }
+
   /* ---- Status mutations (optimistic) ---- */
 
   setHunkStatus(hunkId: number, status: ReviewStatus): void {
@@ -535,6 +552,7 @@ export class ReviewStore {
       return;
     }
     const { file, hunk } = entry;
+    this.releaseFocus([hunkId]);
     const prevHunk = hunk.status();
     const prevFile = file.status();
     hunk.status.set(status);
@@ -568,6 +586,7 @@ export class ReviewStore {
   }
 
   private applyFileStatus(files: readonly FileVM[], status: ReviewStatus): () => void {
+    this.releaseFocus(files.flatMap((f) => f.hunks.map((h) => h.id)));
     const previous = files.map((f) => ({ f, status: f.status(), hunks: f.hunks.map((h) => h.status()) }));
     for (const f of files) {
       f.status.set(status);

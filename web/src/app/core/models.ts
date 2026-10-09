@@ -170,6 +170,9 @@ export interface NoteContext extends Comment {
   excluded: boolean;
   hunkId: number;
   hunkHeader: string;
+  /** Enclosing context reported by git after the @@ header. */
+  hunkSection: string;
+  /** All lines of the hunk; the noted one has focus = true. */
   excerpt: ExcerptLine[];
   /** Line note whose line is no longer part of the diff. */
   outdated: boolean;

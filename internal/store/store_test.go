@@ -274,7 +274,7 @@ func TestListNotesWithContext(t *testing.T) {
 		t.Fatalf("order = %q, want %q", order, want)
 	}
 	del := notes[2]
-	if del.Outdated || del.HunkID != d.Files[0].Hunks[0].ID || len(del.Excerpt) != 3 || !del.Excerpt[0].Focus || del.Excerpt[0].Content != "old1" {
+	if del.Outdated || del.HunkID != d.Files[0].Hunks[0].ID || len(del.Excerpt) != 3 || !del.Excerpt[0].Focus || del.Excerpt[0].Content != "old1" || del.Excerpt[1].Focus {
 		t.Fatalf("deleted line note: %+v", del)
 	}
 	ctxNote := notes[3]

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, computed, inject, output, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
@@ -85,16 +85,22 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
               }
             </div>
             @if (n.excerpt.length > 0) {
+              <div class="excerpt-head" (click)="goTo(n)">
+                <span class="mono">{{ n.hunkHeader }}</span>
+                @if (n.hunkSection) {
+                  <span class="section" title="Enclosing context reported by git"><span class="in">in</span> <span class="mono">{{ n.hunkSection }}</span></span>
+                }
+              </div>
+              <div class="excerpt-scroll">
               <table class="excerpt" (click)="goTo(n)">
-                <caption class="mono">{{ n.hunkHeader }}</caption>
                 <colgroup><col class="c-num" /><col class="c-num" /><col /></colgroup>
                 <tbody>
                   @for (l of n.excerpt; track $index) {
                     <tr [class]="'ln-' + l.kind" [class.focus]="l.focus">
-                      <td class="num" [class.noted]="l.focus && n.side === 'old'">
+                      <td class="num" [class.noted]="l.focus && n.side === 'old'" [title]="l.oldLine ? 'Line ' + l.oldLine : ''">
                         @if (l.focus && n.side === 'old') {<i class="pi pi-comment"></i>} @else {{{ l.oldLine || '' }}}
                       </td>
-                      <td class="num" [class.noted]="l.focus && n.side === 'new'">
+                      <td class="num" [class.noted]="l.focus && n.side === 'new'" [title]="l.newLine ? 'Line ' + l.newLine : ''">
                         @if (l.focus && n.side === 'new') {<i class="pi pi-comment"></i>} @else {{{ l.newLine || '' }}}
                       </td>
                       <td class="code"><span class="sign">{{ sign[l.kind] }}</span>{{ l.content }}</td>
@@ -102,6 +108,7 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
                   }
                 </tbody>
               </table>
+              </div>
             }
             <grb-note-thread [notes]="[n]" [anchor]="{ filePath: n.filePath, side: n.side, line: n.line }" [allowReply]="false" />
           </article>
@@ -168,6 +175,40 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
     .spacer {
       flex: 1;
     }
+    .excerpt-head {
+      display: flex;
+      gap: 0.5rem;
+      align-items: baseline;
+      margin-top: 0.25rem;
+      padding: 0.15rem 0.4rem;
+      font-size: 11px;
+      color: var(--p-text-muted-color);
+      background: var(--grb-hunk-header-bg);
+      border: 1px solid var(--p-content-border-color);
+      border-bottom: none;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      .section {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-style: italic;
+      }
+      .in {
+        font-style: normal;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-right: 0.35rem;
+      }
+    }
+    /* Whole hunk, about 15 lines visible, scrolled to the noted line. */
+    .excerpt-scroll {
+      max-height: 16rem;
+      overflow-y: auto;
+      border: 1px solid var(--p-content-border-color);
+      margin-bottom: 0.5rem;
+    }
     table.excerpt {
       width: 100%;
       border-collapse: collapse;
@@ -175,19 +216,7 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
       font-family: var(--grb-mono);
       font-size: 12px;
       line-height: 1.4;
-      margin: 0.25rem 0 0.5rem;
       cursor: pointer;
-      border: 1px solid var(--p-content-border-color);
-      caption {
-        text-align: left;
-        font-size: 11px;
-        padding: 0.15rem 0.4rem;
-        background: var(--grb-hunk-header-bg);
-        color: var(--p-text-muted-color);
-        caption-side: top;
-        border: 1px solid var(--p-content-border-color);
-        border-bottom: none;
-      }
       td {
         padding: 0;
         vertical-align: top;
@@ -253,6 +282,20 @@ export class NotesPanel {
     ),
     { initialValue: { loading: true, notes: [] as NoteContext[], error: '' } },
   );
+
+  constructor() {
+    // Center each excerpt on its noted line (scrolls the excerpt box only).
+    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    afterRenderEffect(() => {
+      this.groups();
+      untracked(() => {
+        for (const box of Array.from(host.querySelectorAll<HTMLElement>('.excerpt-scroll'))) {
+          const row = box.querySelector<HTMLElement>('tr.focus');
+          if (row) box.scrollTop = row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2;
+        }
+      });
+    });
+  }
 
   protected readonly fileNoteCount = computed(() => this.state().notes.filter((n) => n.filePath !== '').length);
 

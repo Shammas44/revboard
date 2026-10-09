@@ -439,14 +439,19 @@ list the commits touching one file.`,
 }
 
 func newReviewNotesCmd(a *app) *cobra.Command {
-	var markdown bool
+	var (
+		markdown bool
+		context  int
+	)
 	cmd := &cobra.Command{
 		Use:   "notes [session-id]",
 		Short: "Print the notes of a session with the code they refer to",
 		Long: `Print every note of a session: session notes, file notes and line notes.
-Each line note is shown with an excerpt of its hunk, the noted line marked
-with ">". Use --markdown to get a document you can paste in a pull request.`,
+Each line note is shown with the lines of its hunk around the noted line (see
+--context), the noted line marked with ">". Use --markdown to get a document
+you can paste in a pull request.`,
 		Example: `  revboard review notes
+  revboard review notes --context 0          # whole hunks
   revboard review notes 12 --markdown > review-notes.md`,
 		Args: maxArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -462,16 +467,20 @@ with ">". Use --markdown to get a document you can paste in a pull request.`,
 			if err != nil {
 				return err
 			}
-			printNotes(cmd.OutOrStdout(), se, notes, markdown)
+			if context < 0 {
+				return usageError{fmt.Errorf("--context must be >= 0")}
+			}
+			printNotes(cmd.OutOrStdout(), se, notes, markdown, context)
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&markdown, "markdown", false, "print Markdown instead of plain text")
+	cmd.Flags().IntVarP(&context, "context", "C", 3, "lines shown around a noted line (0 = whole hunk)")
 	return cmd
 }
 
 // printNotes renders notes as plain text or Markdown.
-func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, markdown bool) {
+func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, markdown bool, context int) {
 	if markdown {
 		fmt.Fprintf(out, "# Review notes — %s\n\n`%s`\n", se.Name, quoteArgs(se.GitArgs))
 	} else {
@@ -505,11 +514,12 @@ func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, mark
 		if n.FilePath == "" {
 			where = "session"
 		}
+		excerpt := excerptWindow(n.Excerpt, context)
 		if markdown {
 			fmt.Fprintf(out, "\n**%s**\n\n", where)
-			if len(n.Excerpt) > 0 {
+			if len(excerpt) > 0 {
 				fmt.Fprintf(out, "```diff\n%s\n", n.HunkHeader)
-				for _, l := range n.Excerpt {
+				for _, l := range excerpt {
 					fmt.Fprintln(out, excerptLine(l))
 				}
 				fmt.Fprintln(out, "```")
@@ -520,20 +530,33 @@ func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, mark
 			continue
 		}
 		fmt.Fprintf(out, "\n  [%s]\n", where)
-		if len(n.Excerpt) > 0 {
+		if len(excerpt) > 0 {
 			fmt.Fprintf(out, "    %s\n", n.HunkHeader)
-			for _, l := range n.Excerpt {
+			for _, l := range excerpt {
 				marker := " "
 				if l.Focus {
 					marker = ">"
 				}
-				fmt.Fprintf(out, "  %s %5s %s\n", marker, lineNumber(l), excerptLine(l))
+				fmt.Fprintf(out, "  %s %4s %4s %s\n", marker, lineNumber(l.OldLine), lineNumber(l.NewLine), excerptLine(l))
 			}
 		}
 		for _, line := range strings.Split(n.Body, "\n") {
 			fmt.Fprintf(out, "  │ %s\n", line)
 		}
 	}
+}
+
+// excerptWindow keeps the lines within context of the noted line (0 = all).
+func excerptWindow(lines []store.ExcerptLine, context int) []store.ExcerptLine {
+	if context == 0 {
+		return lines
+	}
+	for i, l := range lines {
+		if l.Focus {
+			return lines[max(0, i-context):min(len(lines), i+context+1)]
+		}
+	}
+	return lines
 }
 
 func excerptLine(l store.ExcerptLine) string {
@@ -546,11 +569,11 @@ func excerptLine(l store.ExcerptLine) string {
 	return " " + l.Content
 }
 
-func lineNumber(l store.ExcerptLine) string {
-	if l.NewLine > 0 {
-		return fmt.Sprint(l.NewLine)
+func lineNumber(n int) string {
+	if n == 0 {
+		return ""
 	}
-	return fmt.Sprint(l.OldLine)
+	return fmt.Sprint(n)
 }
 
 // quoteArgs renders git arguments for display.

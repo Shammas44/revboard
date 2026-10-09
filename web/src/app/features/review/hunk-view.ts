@@ -22,7 +22,11 @@ import { HunkLines } from './hunk-lines';
         <i class="pi toggle" [class.pi-chevron-right]="collapsed()" [class.pi-chevron-down]="!collapsed()" (click)="toggle($event)"></i>
       }
       <span class="range mono">&#64;&#64; -{{ hunk().oldStart }},{{ hunk().oldLines }} +{{ hunk().newStart }},{{ hunk().newLines }} &#64;&#64;</span>
-      <span class="section mono">{{ hunk().section }}</span>
+      <span class="section" title="Enclosing context reported by git">
+        @if (hunk().section) {
+          <span class="in">in</span> <span class="mono">{{ hunk().section }}</span>
+        }
+      </span>
       <span class="status-label">{{ statusLabel[s] }}</span>
       <span class="hunk-actions">
         <i class="pi pi-check" [class.on]="s === 'reviewed'" (click)="set('reviewed', $event)" pTooltip="Reviewed (r)" tooltipPosition="left"></i>

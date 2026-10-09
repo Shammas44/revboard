@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
@@ -10,7 +10,6 @@ import { ProgressBar } from 'primeng/progressbar';
 import { SelectButton } from 'primeng/selectbutton';
 import { Splitter } from 'primeng/splitter';
 import { Tag } from 'primeng/tag';
-import { ToggleSwitch } from 'primeng/toggleswitch';
 import { Tooltip } from 'primeng/tooltip';
 import { ReviewStore } from '../../core/review-store';
 import { DiffMode, ReviewStatus } from '../../core/models';
@@ -40,7 +39,6 @@ interface Shortcut {
     SelectButton,
     Splitter,
     Tag,
-    ToggleSwitch,
     Tooltip,
     Autofocus,
     FileTreePanel,
@@ -67,6 +65,24 @@ export class ReviewPage {
   readonly showExclusions = signal(false);
   /** Session name being edited, or null. */
   readonly nameDraft = signal<string | null>(null);
+
+  /** Independent view options, shown as one multi-select button group. */
+  readonly viewOptions = [
+    { label: 'Colors', value: 'colors' },
+    { label: 'Collapse reviewed', value: 'collapse' },
+  ];
+  readonly viewFlags = computed(() => [
+    ...(this.store.syntaxHighlight() ? ['colors'] : []),
+    ...(this.store.collapseReviewed() ? ['collapse'] : []),
+  ]);
+
+  setViewFlags(flags: string[] | null): void {
+    const set = new Set(flags ?? []);
+    this.store.syntaxHighlight.set(set.has('colors'));
+    if (set.has('collapse') !== this.store.collapseReviewed()) {
+      this.store.setCollapseReviewed(set.has('collapse'));
+    }
+  }
 
   readonly diffModes: { label: string; value: DiffMode }[] = [
     { label: 'Unified', value: 'unified' },
@@ -169,7 +185,7 @@ export class ReviewPage {
           this.showNotes.set(true);
           return true;
         case 'z':
-          s.collapseReviewed.update((v) => !v);
+          s.setCollapseReviewed(!s.collapseReviewed());
           return true;
         case 'h':
           s.syntaxHighlight.update((v) => !v);
