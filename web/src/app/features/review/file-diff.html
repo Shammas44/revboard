@@ -1,0 +1,98 @@
+@let f = file();
+@let s = f.summary;
+<header class="file-header" [class]="'file-header status-' + f.status()">
+  <div class="path-line">
+    <i [class]="'status ' + f.status() + ' ' + statusIcon[f.status()]" [pTooltip]="statusLabel[f.status()]" tooltipPosition="left"></i>
+    <span class="path mono">
+      @if (s.changeType === 'renamed' || s.changeType === 'copied') {
+        <span class="muted">{{ s.oldPath }} → </span>
+      }
+      {{ s.path }}
+    </span>
+    <p-tag [value]="s.changeType" [severity]="changeSeverity[s.changeType]" />
+    @if (s.isBinary) {
+      <p-tag value="binary" severity="secondary" />
+    }
+    @if (f.excluded) {
+      <p-tag value="excluded" severity="warn" icon="pi pi-filter-slash" />
+    }
+    @if (s.similarity && s.similarity < 100) {
+      <p-tag [value]="s.similarity + '% similar'" severity="secondary" />
+    }
+    @if (modeChange(); as m) {
+      <p-tag [value]="'mode ' + m" severity="secondary" />
+    }
+    <span class="stat mono"><span class="add">+{{ s.additions }}</span> <span class="del">−{{ s.deletions }}</span></span>
+  </div>
+  <div class="actions">
+    <p-button
+      label="Reviewed"
+      icon="pi pi-check"
+      size="small"
+      [severity]="f.status() === 'reviewed' ? 'success' : 'secondary'"
+      [outlined]="f.status() !== 'reviewed'"
+      (onClick)="setStatus('reviewed')"
+      pTooltip="File reviewed (R)" tooltipPosition="left"
+    />
+    <p-button
+      label="Needs attention"
+      icon="pi pi-flag"
+      size="small"
+      [severity]="f.status() === 'needs_attention' ? 'warn' : 'secondary'"
+      [outlined]="f.status() !== 'needs_attention'"
+      (onClick)="setStatus('needs_attention')"
+      pTooltip="Flag file (A)" tooltipPosition="left"
+    />
+    <p-button icon="pi pi-undo" size="small" severity="secondary" [text]="true" (onClick)="setStatus('unreviewed')" pTooltip="Reset (X)" tooltipPosition="left" />
+    <p-button
+      [icon]="'pi pi-thumbtack'"
+      size="small"
+      [severity]="f.pinned() ? 'info' : 'secondary'"
+      [text]="!f.pinned()"
+      (onClick)="store.togglePin(f.id)"
+      [pTooltip]="f.pinned() ? 'Unpin (s)' : 'Pin (s)'" tooltipPosition="left"
+    />
+    <p-button icon="pi pi-comment" size="small" severity="secondary" [text]="true" (onClick)="addFileNote()" pTooltip="File note (c)" tooltipPosition="left" />
+    <p-button icon="pi pi-history" size="small" severity="secondary" [text]="true" (onClick)="store.commitsView.set({ path: s.path })" pTooltip="File history (L)" tooltipPosition="left" />
+    @if (!f.excluded) {
+      <p-button icon="pi pi-eye-slash" size="small" severity="secondary" [text]="true" (onClick)="store.addExclusion(s.path)" pTooltip="Exclude file" tooltipPosition="left" />
+    }
+  </div>
+</header>
+
+@if (fileNotes().length > 0 || composingFileNote()) {
+  <section class="file-notes">
+    <grb-note-thread [notes]="fileNotes()" [anchor]="fileAnchor()" />
+  </section>
+}
+
+@if (outdatedNotes().length > 0) {
+  <section class="file-notes outdated">
+    <div class="small muted"><i class="pi pi-history"></i> Notes on lines that are no longer part of the diff</div>
+    @for (n of outdatedNotes(); track n.id) {
+      <div class="small muted mono">{{ n.side }} line {{ n.line }}</div>
+      <grb-note-thread [notes]="[n]" [anchor]="{ filePath: n.filePath, side: n.side, line: n.line }" [allowReply]="false" />
+    }
+  </section>
+}
+
+@if (currentDetail(); as d) {
+  @if (d.hunks.length === 0) {
+    <div class="no-hunks muted">
+      @if (s.isBinary) {
+        Binary file — no textual diff.
+      } @else if (s.changeType === 'renamed' || s.changeType === 'copied') {
+        File {{ s.changeType }} without content change.
+      } @else {
+        No content change (mode or metadata only).
+      }
+    </div>
+  }
+  @for (h of d.hunks; track h.id; let i = $index) {
+    @if (f.hunks[i]; as vm) {
+      <grb-hunk-view [hunk]="h" [vm]="vm" [path]="s.path" [attr.id]="'hunk-' + h.id" />
+    }
+  }
+} @else if (loading()) {
+  <div class="no-hunks muted"><i class="pi pi-spin pi-spinner"></i> Loading diff…</div>
+}

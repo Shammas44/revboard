@@ -1,0 +1,103 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1><i class="pi pi-check-square"></i> Git-Review-Board</h1>
+      <p class="muted">Your review sessions across all projects.</p>
+    </div>
+    <div class="header-actions">
+      <label class="archived-toggle">
+        <p-toggleswitch [ngModel]="showArchived()" (ngModelChange)="setShowArchived($event)" />
+        Show archived
+      </label>
+      <p-button icon="pi pi-refresh" [text]="true" severity="secondary" (onClick)="reload()" pTooltip="Reload" tooltipPosition="left" />
+    </div>
+  </header>
+
+  @if (error(); as err) {
+    <div class="error-box"><i class="pi pi-exclamation-triangle"></i> {{ err }}</div>
+  }
+
+  @if (empty()) {
+    <div class="empty">
+      <i class="pi pi-inbox"></i>
+      <h2>No review yet</h2>
+      <p>Start one from a terminal, inside the repository to review:</p>
+      <pre>revboard review start "git diff main feature/my-branch"</pre>
+    </div>
+  }
+
+  @for (g of groups(); track g.project.id) {
+    <section class="project">
+      <div class="project-header">
+        <h2>
+          {{ g.project.name }}
+          @if (g.project.isCurrent) {
+            <p-tag value="current" severity="info" />
+          }
+        </h2>
+        <span class="muted mono">{{ g.project.repoPath }}</span>
+      </div>
+
+      @if (g.sessions.length === 0) {
+        <p class="muted">No {{ showArchived() ? '' : 'active ' }}review session.</p>
+      } @else {
+        <p-table [value]="g.sessions" size="small" dataKey="id">
+          <ng-template #header>
+            <tr>
+              <th>#</th>
+              <th>Session</th>
+              <th style="width: 14rem">Progress</th>
+              <th>Attention</th>
+              <th>Files</th>
+              <th>Last opened</th>
+              <th></th>
+            </tr>
+          </ng-template>
+          <ng-template #body let-s>
+            <tr [class.archived]="s.state === 'archived'">
+              <td class="muted">{{ s.id }}</td>
+              <td>
+                <a [routerLink]="['/sessions', s.id]" class="session-link">{{ s.name }}</a>
+                @if (s.state === 'archived') {
+                  <p-tag value="archived" severity="secondary" />
+                }
+                <div class="muted mono small">{{ command(s) }}</div>
+              </td>
+              <td>
+                <p-progressbar [value]="percent(s)" [showValue]="false" styleClass="thin" />
+                <span class="small muted">{{ percent(s) }}% · {{ s.progress.reviewedHunks }}/{{ s.progress.totalHunks }} hunks</span>
+              </td>
+              <td>
+                @if (s.progress.attentionFiles > 0) {
+                  <p-tag [value]="s.progress.attentionFiles + ' files'" severity="warn" icon="pi pi-flag" />
+                }
+              </td>
+              <td>{{ s.progress.totalFiles }}</td>
+              <td class="muted small">{{ s.lastOpenedAt | date: 'medium' }}</td>
+              <td class="actions">
+                <p-button icon="pi pi-play" size="small" [routerLink]="['/sessions', s.id]" pTooltip="Open" tooltipPosition="left" />
+                <p-button icon="pi pi-pencil" size="small" severity="secondary" [text]="true" (onClick)="startRename(s)" pTooltip="Rename" tooltipPosition="left" />
+                @if (s.state === 'active') {
+                  <p-button icon="pi pi-box" size="small" severity="secondary" [text]="true" (onClick)="setArchived(s, true)" pTooltip="Archive" tooltipPosition="left" />
+                } @else {
+                  <p-button icon="pi pi-replay" size="small" severity="secondary" [text]="true" (onClick)="setArchived(s, false)" pTooltip="Unarchive" tooltipPosition="left" />
+                }
+                <p-button icon="pi pi-trash" size="small" severity="danger" [text]="true" (onClick)="remove(s)" pTooltip="Delete" tooltipPosition="left" />
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      }
+    </section>
+  }
+</div>
+
+<p-dialog header="Rename review session" [visible]="renaming() !== null" (visibleChange)="!$event && renaming.set(null)" [modal]="true" [dismissableMask]="true" [style]="{ width: '30rem' }">
+  <form class="rename-form" (ngSubmit)="saveRename()">
+    <input pInputText name="name" [(ngModel)]="nameDraft" [fluid]="true" autocomplete="off" />
+    <div class="rename-actions">
+      <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="renaming.set(null)" />
+      <p-button type="submit" label="Rename" [disabled]="!nameDraft.trim()" />
+    </div>
+  </form>
+</p-dialog>

@@ -1,0 +1,59 @@
+:host {
+  display: block;
+  overflow: auto;
+  padding: 0 0.75rem 3rem;
+}
+
+.file-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.25rem;
+  background: var(--p-content-background);
+  border-bottom: 1px solid var(--p-content-border-color);
+  margin-bottom: 0.75rem;
+}
+
+.path-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.path {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.stat {
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.file-notes {
+  margin-bottom: 0.75rem;
+
+  &.outdated {
+    border-left: 3px solid var(--p-content-border-color);
+    padding-left: 0.5rem;
+  }
+}
+
+.no-hunks {
+  padding: 2rem;
+  text-align: center;
+  border: 1px dashed var(--p-content-border-color);
+  border-radius: 6px;
+}

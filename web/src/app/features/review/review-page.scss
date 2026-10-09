@@ -1,0 +1,127 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(12rem, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+  background: var(--p-content-background);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+
+  > div {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.session-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  .project {
+    color: var(--p-text-muted-color);
+    font-weight: 500;
+  }
+
+  .sep {
+    color: var(--p-text-muted-color);
+  }
+}
+
+.topbar-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.attention {
+  color: var(--grb-attention);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.5rem;
+  white-space: nowrap;
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/* Display mode is owned by each child component's :host. */
+.fill {
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+}
+
+.center {
+  margin: auto;
+  padding: 3rem;
+  text-align: center;
+}
+
+.shortcuts {
+  border-collapse: collapse;
+  width: 100%;
+
+  td {
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--p-content-border-color);
+  }
+}
+
+.name {
+  cursor: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rename {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  cursor: pointer;
+  visibility: hidden;
+}
+
+.session-name:hover .rename {
+  visibility: visible;
+}
+
+.name-input {
+  width: min(28rem, 60vw);
+}
+
+.notes-help {
+  margin-top: 0;
+}

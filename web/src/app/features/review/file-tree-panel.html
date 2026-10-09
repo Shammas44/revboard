@@ -1,0 +1,87 @@
+<div class="tools">
+  <p-iconfield>
+    <p-inputicon class="pi pi-search" />
+    <input
+      #search
+      pInputText
+      pSize="small"
+      type="text"
+      placeholder="Search files  ( / )"
+      [ngModel]="store.search()"
+      (ngModelChange)="store.search.set($event)"
+      (keydown)="onSearchKey($event)"
+      [fluid]="true"
+    />
+  </p-iconfield>
+  <p-select
+    [options]="filters"
+    optionLabel="label"
+    optionValue="value"
+    size="small"
+    [ngModel]="store.filter()"
+    (ngModelChange)="store.filter.set($event)"
+    [fluid]="true"
+  />
+</div>
+
+@if (store.pinnedFiles().length > 0) {
+  <div class="pinned">
+    <div class="section-title"><i class="pi pi-thumbtack"></i> Pinned</div>
+    @for (f of store.pinnedFiles(); track f.id) {
+      <div class="row file" [class.selected]="f.id === store.selectedFileId()" (click)="store.selectFile(f.id)" [title]="f.summary.path">
+        <i [class]="'status ' + f.status() + ' ' + statusIcon[f.status()]"></i>
+        <span class="name">{{ fileName(f.summary.path) }}</span>
+      </div>
+    }
+  </div>
+}
+
+<div class="section-title">
+  @if (store.filter() === 'excluded') {
+    Excluded files <span class="muted">({{ store.visibleFiles().length }})</span>
+  } @else {
+    Files <span class="muted">({{ store.visibleFiles().length }}/{{ store.includedFiles().length }})</span>
+  }
+</div>
+
+<cdk-virtual-scroll-viewport class="tree" [itemSize]="rowHeight" [minBufferPx]="400" [maxBufferPx]="800">
+  <div
+    *cdkVirtualFor="let row of store.treeRows(); trackBy: trackRow"
+    class="row"
+    [style.padding-left.px]="8 + row.depth * 14"
+  >
+    @if (row.kind === 'dir') {
+      @let done = doneCount(row.files);
+      <div class="dir" (click)="store.toggleDir(row.dir.path)" [title]="row.dir.path">
+        <i class="chevron pi" [class.pi-chevron-right]="row.collapsed" [class.pi-chevron-down]="!row.collapsed"></i>
+        <i class="pi pi-folder folder"></i>
+        <span class="name">{{ row.dir.name }}</span>
+        @if (hasAttention(row.files)) {
+          <i class="pi pi-flag-fill status needs_attention"></i>
+        }
+        <span class="count" [class.complete]="done === row.files.length">{{ done }}/{{ row.files.length }}</span>
+        <span class="dir-actions">
+          <i class="pi pi-check" (click)="markDir(row.files, 'reviewed', $event)" pTooltip="Mark reviewed" tooltipPosition="left"></i>
+          <i class="pi pi-undo" (click)="markDir(row.files, 'unreviewed', $event)" pTooltip="Reset" tooltipPosition="left"></i>
+          @if (store.filter() !== 'excluded') {
+            <i class="pi pi-eye-slash" (click)="excludeDir(row.dir.path, $event)" pTooltip="Exclude folder" tooltipPosition="left"></i>
+          }
+        </span>
+      </div>
+    } @else {
+      @let f = row.file;
+      <div class="file" [class.selected]="f.id === store.selectedFileId()" (click)="store.selectFile(f.id)" [title]="f.summary.path + ' — ' + statusLabel[f.status()]">
+        <i [class]="'status ' + f.status() + ' ' + statusIcon[f.status()]"></i>
+        <span class="change {{ f.summary.changeType }}">{{ changeLetter[f.summary.changeType] }}</span>
+        <span class="name" [class.done]="f.status() === 'reviewed'">{{ row.name }}</span>
+        @if (noteCount(f); as n) {
+          <span class="notes"><i class="pi pi-comment"></i>{{ n }}</span>
+        }
+        @if (f.pinned()) {
+          <i class="pi pi-thumbtack pin"></i>
+        }
+        <span class="stat"><span class="add">+{{ f.summary.additions }}</span> <span class="del">−{{ f.summary.deletions }}</span></span>
+      </div>
+    }
+  </div>
+</cdk-virtual-scroll-viewport>

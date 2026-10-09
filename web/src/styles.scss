@@ -1,0 +1,397 @@
+@use 'primeicons/primeicons.css';
+
+/* ---- Design tokens (light, then dark) ---- */
+:root {
+  --grb-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --grb-code-bg: #f6f8fa;
+  --grb-add-bg: #e6ffec;
+  --grb-add-num-bg: #ccffd8;
+  --grb-del-bg: #ffebe9;
+  --grb-del-num-bg: #ffd7d5;
+  --grb-add-fg: #1a7f37;
+  --grb-del-fg: #cf222e;
+  --grb-hunk-header-bg: #ddf4ff;
+  --grb-reviewed: #1a7f37;
+  --grb-attention: #bf8700;
+  --grb-unreviewed: #8c959f;
+  --grb-active: var(--p-primary-color);
+  --grb-focus-bg: #fff8c5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grb-code-bg: #161b22;
+    --grb-add-bg: rgba(46, 160, 67, 0.15);
+    --grb-add-num-bg: rgba(63, 185, 80, 0.3);
+    --grb-del-bg: rgba(248, 81, 73, 0.1);
+    --grb-del-num-bg: rgba(248, 81, 73, 0.3);
+    --grb-add-fg: #3fb950;
+    --grb-del-fg: #f85149;
+    --grb-hunk-header-bg: rgba(56, 139, 253, 0.15);
+    --grb-reviewed: #3fb950;
+    --grb-attention: #d29922;
+    --grb-unreviewed: #6e7681;
+    --grb-focus-bg: rgba(187, 128, 9, 0.3);
+  }
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  background: var(--p-content-background);
+  color: var(--p-text-color);
+}
+
+/* ---- Utilities ---- */
+.mono {
+  font-family: var(--grb-mono);
+}
+
+.muted {
+  color: var(--p-text-muted-color);
+}
+
+.small {
+  font-size: 0.8rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.add {
+  color: var(--grb-add-fg);
+}
+
+.del {
+  color: var(--grb-del-fg);
+}
+
+kbd {
+  font-family: var(--grb-mono);
+  font-size: 0.8rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--p-content-border-color);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.error-box {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: var(--grb-del-bg);
+  color: var(--grb-del-fg);
+}
+
+.p-progressbar.thin {
+  height: 0.45rem;
+}
+
+/* ---- Status icons ---- */
+.status {
+  font-size: 0.85rem;
+
+  &.reviewed {
+    color: var(--grb-reviewed);
+  }
+
+  &.needs_attention {
+    color: var(--grb-attention);
+  }
+
+  &.unreviewed {
+    color: var(--grb-unreviewed);
+  }
+}
+
+.change {
+  &.added {
+    color: var(--grb-add-fg);
+  }
+
+  &.deleted {
+    color: var(--grb-del-fg);
+  }
+
+  &.modified {
+    color: var(--p-primary-color);
+  }
+
+  &.renamed,
+  &.copied {
+    color: var(--grb-attention);
+  }
+}
+
+/* ---- Hunks ---- */
+.hunk {
+  display: block;
+  margin-bottom: 1rem;
+  border: 1px solid var(--p-content-border-color);
+  border-left: 4px solid var(--grb-unreviewed);
+  border-radius: 6px;
+  overflow: hidden;
+  /* Let the browser skip layout and paint of off-screen hunks. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+  scroll-margin-top: 4.5rem;
+
+  &[data-status='reviewed'] {
+    border-left-color: var(--grb-reviewed);
+  }
+
+  &[data-status='needs_attention'] {
+    border-left-color: var(--grb-attention);
+  }
+
+  &.active {
+    box-shadow: 0 0 0 2px var(--grb-active);
+  }
+}
+
+.hunk-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.6rem;
+  background: var(--grb-hunk-header-bg);
+  font-size: 0.8rem;
+  cursor: pointer;
+
+  .range {
+    color: var(--p-text-muted-color);
+    white-space: nowrap;
+  }
+
+  .section {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toggle {
+    font-size: 0.75rem;
+  }
+
+  .status-label {
+    font-size: 0.75rem;
+    color: var(--p-text-muted-color);
+  }
+}
+
+.hunk[data-status='reviewed'] .status-label {
+  color: var(--grb-reviewed);
+}
+
+.hunk[data-status='needs_attention'] .status-label {
+  color: var(--grb-attention);
+}
+
+.hunk-actions {
+  display: inline-flex;
+  gap: 0.75rem;
+
+  .pi {
+    cursor: pointer;
+    color: var(--p-text-muted-color);
+
+    &:hover {
+      color: var(--p-text-color);
+    }
+  }
+
+  .pi-check.on {
+    color: var(--grb-reviewed);
+  }
+
+  .pi-flag.on {
+    color: var(--grb-attention);
+  }
+}
+
+/* ---- Diff lines ---- */
+table.diff {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--grb-mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+  tab-size: 4;
+
+  td {
+    padding: 0;
+    vertical-align: top;
+  }
+
+  col.c-num {
+    width: 3.6rem;
+  }
+
+  td.num {
+    padding: 0 0.5rem;
+    text-align: right;
+    color: var(--p-text-muted-color);
+    user-select: none;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--p-primary-color);
+      text-decoration: underline;
+    }
+  }
+
+  td.code {
+    padding: 0 0.75rem 0 0.25rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .sign {
+    display: inline-block;
+    width: 1.1rem;
+    user-select: none;
+    color: var(--p-text-muted-color);
+  }
+
+  .eof {
+    color: var(--grb-del-fg);
+    margin-left: 0.25rem;
+  }
+
+  /* Unified view colours whole rows, split view colours cells. */
+  tr.ln-add td,
+  td.ln-add {
+    background: var(--grb-add-bg);
+  }
+
+  tr.ln-add td.num,
+  td.num.ln-add {
+    background: var(--grb-add-num-bg);
+  }
+
+  tr.ln-delete td,
+  td.ln-delete {
+    background: var(--grb-del-bg);
+  }
+
+  tr.ln-delete td.num,
+  td.num.ln-delete {
+    background: var(--grb-del-num-bg);
+  }
+
+  &.split td.code + td.num {
+    border-left: 1px solid var(--p-content-border-color);
+  }
+
+  td.empty {
+    cursor: default;
+    background: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      var(--p-content-border-color) 6px 7px
+    );
+  }
+
+  tr.note-row td {
+    padding: 0.5rem 0.75rem 0.5rem 7.5rem;
+    background: var(--p-content-background);
+    border-top: 1px solid var(--p-content-border-color);
+    border-bottom: 1px solid var(--p-content-border-color);
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+  }
+}
+
+/* ---- Notes ---- */
+.note-thread {
+  display: block;
+}
+
+.note {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+  border-radius: 6px;
+  background: var(--grb-code-bg);
+  border-left: 3px solid var(--p-primary-color);
+}
+
+.note-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+
+  .pi {
+    cursor: pointer;
+
+    &:hover {
+      color: var(--p-text-color);
+    }
+  }
+}
+
+.note-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.composer {
+  margin-bottom: 0.25rem;
+}
+
+/* ---- Tooltips: short, single line ---- */
+.p-tooltip {
+  max-width: none;
+
+  .p-tooltip-text {
+    white-space: nowrap;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Note editors keep a usable height even when measured while hidden (dialogs). */
+.note-thread textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+/* Splitter panels take focus on click (tabindex=-1); no focus ring for the whole pane. */
+.p-splitter-panel:focus {
+  outline: none;
+}
+
+/* ---- Noted and focused lines ---- */
+table.diff {
+  tr.has-note td.num,
+  td.num.has-note {
+    box-shadow: inset 3px 0 0 var(--p-primary-color);
+  }
+
+  tr.focused td,
+  td.focused {
+    background: var(--grb-focus-bg) !important;
+    animation: grb-focus-flash 1.2s ease-out;
+  }
+}
+
+@keyframes grb-focus-flash {
+  from {
+    box-shadow: inset 0 0 0 2px var(--grb-attention);
+  }
+}

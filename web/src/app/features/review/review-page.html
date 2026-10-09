@@ -1,0 +1,148 @@
+@if (store.loading()) {
+  <div class="center muted"><i class="pi pi-spin pi-spinner"></i> Loading review…</div>
+} @else if (store.loadError(); as err) {
+  <div class="center">
+    <div class="error-box"><i class="pi pi-exclamation-triangle"></i> {{ err }}</div>
+    <p><a routerLink="/">Back to all reviews</a></p>
+  </div>
+} @else {
+  @let session = store.session()!;
+  @let p = store.progress();
+  <header class="topbar">
+    <div class="topbar-left">
+      <p-button icon="pi pi-home" [text]="true" severity="secondary" routerLink="/" pTooltip="All reviews" tooltipPosition="left" />
+      <div class="title">
+        <div class="session-name">
+          <span class="project">{{ session.projectName }}</span>
+          <span class="sep">/</span>
+          @if (nameDraft() !== null) {
+            <input
+              pInputText
+              pSize="small"
+              class="name-input"
+              [ngModel]="nameDraft()"
+              (ngModelChange)="nameDraft.set($event)"
+              (keydown)="onRenameKey($event)"
+              (blur)="commitRename()"
+              grbAutofocus
+            />
+          } @else {
+            <span class="name" (dblclick)="startRename()">{{ session.name }}</span>
+            <i class="pi pi-pencil rename" (click)="startRename()" pTooltip="Rename" tooltipPosition="left"></i>
+          }
+          @if (session.state === 'archived') {
+            <p-tag value="archived" severity="secondary" />
+          }
+        </div>
+        <div class="mono small muted" [title]="'Captured ' + session.capturedAt + ' at ' + session.headSha">{{ command() }}</div>
+      </div>
+    </div>
+
+    <div class="topbar-progress">
+      <p-progressbar [value]="store.percent()" [showValue]="false" styleClass="thin" />
+      <div class="small">
+        <strong>{{ store.percent() }}%</strong>
+        <span class="muted"> · {{ p.reviewedHunks }}/{{ p.totalHunks }} hunks · {{ p.reviewedFiles }}/{{ p.totalFiles }} files</span>
+        @if (p.attentionFiles > 0) {
+          <span class="attention"> · <i class="pi pi-flag-fill"></i> {{ p.attentionFiles }} need attention</span>
+        }
+        @if (p.excludedFiles > 0) {
+          <span class="muted"> · {{ p.excludedFiles }} excluded</span>
+        }
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <p-selectbutton
+        [options]="diffModes"
+        optionLabel="label"
+        optionValue="value"
+        size="small"
+        [allowEmpty]="false"
+        [ngModel]="store.diffMode()"
+        (ngModelChange)="store.diffMode.set($event)"
+        pTooltip="Diff view (v)"
+        tooltipPosition="left"
+      />
+      <label class="collapse-toggle small" pTooltip="Collapse reviewed (z)" tooltipPosition="left">
+        <p-toggleswitch [ngModel]="store.collapseReviewed()" (ngModelChange)="store.collapseReviewed.set($event)" />
+        Collapse reviewed
+      </label>
+      <p-button
+        icon="pi pi-filter-slash"
+        [text]="true"
+        severity="secondary"
+        [badge]="session.exclusions.length ? '' + session.exclusions.length : undefined"
+        (onClick)="showExclusions.set(true)"
+        pTooltip="Excluded files (e)"
+        tooltipPosition="left"
+      />
+      <p-button icon="pi pi-history" [text]="true" severity="secondary" (onClick)="store.commitsView.set({ path: null })" pTooltip="Commits (l)" tooltipPosition="left" />
+      <p-button
+        icon="pi pi-comments"
+        [text]="true"
+        severity="secondary"
+        [badge]="store.comments().length ? '' + store.comments().length : undefined"
+        (onClick)="showNotes.set(true)"
+        pTooltip="Notes (N)"
+        tooltipPosition="left"
+      />
+      <p-button icon="pi pi-sync" [text]="true" severity="secondary" [loading]="store.refreshing()" (onClick)="store.refresh()" pTooltip="Refresh diff" tooltipPosition="left" />
+      <p-button icon="pi pi-question-circle" [text]="true" severity="secondary" (onClick)="showHelp.set(true)" pTooltip="Shortcuts (?)" tooltipPosition="left" />
+    </div>
+  </header>
+
+  <p-splitter class="workspace" [panelSizes]="[22, 78]" [minSizes]="[12, 40]" stateKey="grb-splitter" stateStorage="local">
+    <ng-template #panel>
+      <grb-file-tree-panel class="fill" />
+    </ng-template>
+    <ng-template #panel>
+      @if (store.selectedFile(); as file) {
+        <grb-file-diff class="fill" [file]="file" [detail]="store.fileDetail()" [loading]="store.detailLoading()" />
+      } @else {
+        <div class="center muted">Select a file in the tree.</div>
+      }
+    </ng-template>
+  </p-splitter>
+}
+
+<p-dialog header="Keyboard shortcuts" [visible]="showHelp()" (visibleChange)="showHelp.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '32rem' }">
+  <table class="shortcuts">
+    @for (s of shortcuts; track s.keys) {
+      <tr>
+        <td><kbd>{{ s.keys }}</kbd></td>
+        <td>{{ s.action }}</td>
+      </tr>
+    }
+  </table>
+</p-dialog>
+
+<p-drawer
+  [visible]="showNotes()"
+  (visibleChange)="showNotes.set($event)"
+  position="right"
+  header="Notes"
+  [style]="{ width: '46rem', maxWidth: '95vw' }"
+>
+  @if (showNotes()) {
+    <grb-notes-panel (navigated)="showNotes.set(false)" />
+  }
+</p-drawer>
+
+<grb-exclusions-dialog [visible]="showExclusions()" (visibleChange)="showExclusions.set($event)" />
+
+<p-drawer
+  [visible]="store.commitsView() !== null"
+  (visibleChange)="!$event && store.commitsView.set(null)"
+  position="right"
+  [header]="store.commitsView()?.path ? 'File history' : 'Commits'"
+  [style]="{ width: '40rem', maxWidth: '95vw' }"
+>
+  @if (store.commitsView(); as view) {
+    <grb-commits-panel
+      [path]="view.path"
+      (fileOpened)="store.commitsView.set(null)"
+      (showAll)="store.commitsView.set({ path: null })"
+    />
+  }
+</p-drawer>

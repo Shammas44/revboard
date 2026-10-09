@@ -1,0 +1,144 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  font-size: 0.875rem;
+}
+
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+}
+
+.section-title {
+  padding: 0.4rem 0.6rem 0.2rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--p-text-muted-color);
+}
+
+.pinned {
+  border-bottom: 1px solid var(--p-content-border-color);
+  padding-bottom: 0.25rem;
+  max-height: 30%;
+  overflow: auto;
+
+  .row {
+    padding-left: 0.75rem;
+  }
+}
+
+.tree {
+  flex: 1;
+  min-height: 0;
+}
+
+.row {
+  height: 28px;
+  box-sizing: border-box;
+  padding-right: 0.5rem;
+}
+
+.dir,
+.file,
+.pinned .row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 28px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 0.25rem;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--p-content-hover-background);
+  }
+}
+
+.pinned .row.selected,
+.file.selected {
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+
+  &.done {
+    color: var(--p-text-muted-color);
+  }
+}
+
+.chevron {
+  font-size: 0.7rem;
+  width: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+.folder {
+  color: var(--p-text-muted-color);
+}
+
+.count {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+
+  &.complete {
+    color: var(--grb-reviewed);
+  }
+}
+
+.dir-actions {
+  display: none;
+  gap: 0.5rem;
+
+  .pi {
+    font-size: 0.8rem;
+    color: var(--p-text-muted-color);
+
+    &:hover {
+      color: var(--p-primary-color);
+    }
+  }
+}
+
+.dir:hover .dir-actions {
+  display: inline-flex;
+}
+
+.change {
+  font-family: var(--grb-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 0.8rem;
+  text-align: center;
+}
+
+.notes {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+
+  .pi {
+    font-size: 0.7rem;
+  }
+}
+
+.pin {
+  font-size: 0.7rem;
+  color: var(--p-primary-color);
+}
+
+.stat {
+  font-family: var(--grb-mono);
+  font-size: 0.7rem;
+}
