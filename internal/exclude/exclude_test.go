@@ -37,7 +37,7 @@ func TestMatch(t *testing.T) {
 }
 
 func TestNormalize(t *testing.T) {
-	for _, bad := range []string{"", "  ", "/", "!x.md", "a[.go"} {
+	for _, bad := range []string{"", "  ", "/", "!", "!!x", "a[.go"} {
 		if _, err := Normalize(bad); err == nil {
 			t.Errorf("Normalize(%q): expected error", bad)
 		}
@@ -48,5 +48,29 @@ func TestNormalize(t *testing.T) {
 	}
 	if !New(nil).Empty() || New(nil).Match("a") {
 		t.Fatal("empty matcher should match nothing")
+	}
+}
+
+func TestNegation(t *testing.T) {
+	m := New([]string{"docs/", "*.md", "!docs/keep.md", "!README.md"})
+	for path, want := range map[string]bool{
+		"docs/a.txt":    true,
+		"docs/keep.md":  false,
+		"docs/other.md": true,
+		"README.md":     false,
+		"src/README.md": false,
+		"src/guide.md":  true,
+		"src/main.go":   false,
+	} {
+		if got := m.Match(path); got != want {
+			t.Errorf("Match(%q) = %v, want %v", path, got, want)
+		}
+	}
+	// Order matters: a later exclusion wins over an earlier re-inclusion.
+	if !New([]string{"!a.md", "*.md"}).Match("a.md") {
+		t.Error("last matching rule should win")
+	}
+	if n, err := Normalize(" !./docs/x.md "); err != nil || n != "!docs/x.md" {
+		t.Fatalf("Normalize negation = %q, %v", n, err)
 	}
 }

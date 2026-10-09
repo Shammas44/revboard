@@ -10,11 +10,11 @@ import { ReviewStore } from '../../core/review-store';
   selector: 'grb-exclusions-dialog',
   imports: [FormsModule, Button, Dialog, InputText],
   template: `
-    <p-dialog header="Excluded files" [visible]="visible()" (visibleChange)="visible.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '36rem' }">
+    <p-dialog header="Excluded files" [visible]="visible()" (visibleChange)="visible.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '60rem', maxWidth: '95vw' }">
       <p class="muted small help">
         Excluded files are hidden from the tree and do not count in the progress. Their statuses and notes are kept.
         Rules: <code>*.md</code> (name at any depth), <code>docs/</code> (folder), <code>src/gen/</code> (path from root),
-        <code>**/*.snap</code>.
+        <code>**/*.snap</code>, <code>!docs/keep.md</code> (re-include). The last matching rule wins.
       </p>
 
       <form class="add" (ngSubmit)="add()">
@@ -34,7 +34,11 @@ import { ReviewStore } from '../../core/review-store';
       <ul class="rules">
         @for (r of rules(); track r) {
           <li>
-            <span class="mono">{{ r }}</span>
+            @if (r.startsWith('!')) {
+              <span class="mono rule"><span class="include">include</span> {{ r.slice(1) }}</span>
+            } @else {
+              <span class="mono rule">{{ r }}</span>
+            }
             <p-button icon="pi pi-times" size="small" severity="secondary" [text]="true" (onClick)="remove(r)" ariaLabel="Remove rule" />
           </li>
         } @empty {
@@ -70,6 +74,9 @@ import { ReviewStore } from '../../core/review-store';
       background: var(--grb-code-bg);
       color: var(--p-text-color);
       border-radius: 999px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      text-align: left;
       padding: 0.1rem 0.6rem;
       cursor: pointer;
       font-size: 0.75rem;
@@ -78,7 +85,19 @@ import { ReviewStore } from '../../core/review-store';
       list-style: none;
       padding: 0;
       margin: 1rem 0 0.75rem;
+      .rule {
+        overflow-wrap: anywhere;
+        min-width: 0;
+      }
+      .include {
+        font-family: system-ui, sans-serif;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: var(--grb-reviewed);
+        margin-right: 0.35rem;
+      }
       li {
+        gap: 0.5rem;
         display: flex;
         justify-content: space-between;
         align-items: center;

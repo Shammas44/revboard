@@ -38,9 +38,9 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
         <colgroup><col class="c-num" /><col class="c-num" /><col /></colgroup>
         <tbody>
           @for (c of cells(); track $index) {
-            <tr [class]="'ln-' + c.line.kind" [class.focused]="focusAnchor() === c.side + ':' + c.number" [class.has-note]="notesByKey().has(c.key)" [attr.data-anchor]="c.side + ':' + c.number">
-              <td class="num" (click)="compose(c)">{{ c.line.oldLine || '' }}</td>
-              <td class="num" (click)="compose(c)">{{ c.line.newLine || '' }}</td>
+            <tr [class]="'ln-' + c.line.kind" [class.focused]="isFocus(c)" [class.marked]="isMarked(c)" [attr.data-anchor]="c.side + ':' + c.number">
+              <td class="num" [class.noted]="c.side === 'old' && isMarked(c)" (click)="compose(c)" [title]="numTitle(c, c.line.oldLine)">@if (c.line.oldLine) {<span class="n">{{ c.line.oldLine }}</span><i class="pi pi-comment ic"></i>}</td>
+              <td class="num" [class.noted]="c.side === 'new' && isMarked(c)" (click)="compose(c)" [title]="numTitle(c, c.line.newLine)">@if (c.line.newLine) {<span class="n">{{ c.line.newLine }}</span><i class="pi pi-comment ic"></i>}</td>
               <td class="code"><span class="sign">{{ sign[c.line.kind] }}</span>@if (html(); as h) {<span [innerHTML]="h[c.index]"></span>} @else {{{ c.line.content }}}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
             </tr>
             @let notes = notesByKey().get(c.key);
@@ -59,14 +59,14 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
           @for (r of splitRows(); track $index) {
             <tr>
               @if (r.left; as c) {
-                <td class="num" [class]="cellClass(c)" (click)="compose(c)" [attr.data-anchor]="c.side + ':' + c.number">{{ c.line.oldLine }}</td>
+                <td class="num" [class]="numClass(c, 'old')" (click)="compose(c)" [attr.data-anchor]="c.side + ':' + c.number" [title]="numTitle(c, c.line.oldLine)"><span class="n">{{ c.line.oldLine }}</span><i class="pi pi-comment ic"></i></td>
                 <td class="code" [class]="cellClass(c)"><span class="sign">{{ sign[c.line.kind] }}</span>@if (html(); as h) {<span [innerHTML]="h[c.index]"></span>} @else {{{ c.line.content }}}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
               } @else {
                 <td class="num empty"></td>
                 <td class="code empty"></td>
               }
               @if (r.right; as c) {
-                <td class="num" [class]="cellClass(c)" (click)="compose(c)" [attr.data-anchor]="c.side + ':' + c.number">{{ c.line.newLine }}</td>
+                <td class="num" [class]="numClass(c, 'new')" (click)="compose(c)" [attr.data-anchor]="c.side + ':' + c.number" [title]="numTitle(c, c.line.newLine)"><span class="n">{{ c.line.newLine }}</span><i class="pi pi-comment ic"></i></td>
                 <td class="code" [class]="cellClass(c)"><span class="sign">{{ sign[c.line.kind] }}</span>@if (html(); as h) {<span [innerHTML]="h[c.index]"></span>} @else {{{ c.line.content }}}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
               } @else {
                 <td class="num empty"></td>
@@ -153,11 +153,28 @@ export class HunkLines {
     return f && f.hunkId === this.hunk().id ? `${f.side}:${f.line}` : null;
   });
 
+  protected isFocus(c: Cell): boolean {
+    return this.focusAnchor() === `${c.side}:${c.number}`;
+  }
+
+  /** The line carries notes (or is the focused line): yellow border and comment icon. */
+  protected isMarked(c: Cell): boolean {
+    return this.notesByKey().has(c.key) || this.isFocus(c);
+  }
+
   protected cellClass(c: Cell): string {
-    let cls = 'ln-' + c.line.kind;
-    if (this.focusAnchor() === `${c.side}:${c.number}`) cls += ' focused';
-    if (this.notesByKey().has(c.key)) cls += ' has-note';
-    return cls;
+    return this.isFocus(c) ? `ln-${c.line.kind} focused` : `ln-${c.line.kind}`;
+  }
+
+  /** Split view: only the number cell of the note's side carries the marker. */
+  protected numClass(c: Cell, cellSide: Side): string {
+    return cellSide === c.side && this.isMarked(c) ? `${this.cellClass(c)} noted` : this.cellClass(c);
+  }
+
+  protected numTitle(c: Cell, number: number): string {
+    const n = this.notesByKey().get(c.key)?.length ?? 0;
+    if (!number) return '';
+    return n > 0 ? `Line ${c.number}: ${n} note${n > 1 ? 's' : ''}` : `Add a note on line ${number}`;
   }
 
   protected anchor(c: Cell): NoteAnchor {

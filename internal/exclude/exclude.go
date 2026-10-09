@@ -6,7 +6,9 @@
 //	docs/           trailing slash: everything below a directory (at any depth when no other slash)
 //	src/gen/**      slash inside: matched against the full path from the repository root
 //	**/*.snap       "**" matches any number of directories
-//	!keep.md        not supported (rules only exclude)
+//	!docs/keep.md   "!" re-includes paths excluded by a previous rule
+//
+// As with gitignore, rules are applied in order and the last matching rule wins.
 package exclude
 
 import (
@@ -22,12 +24,13 @@ const MaxRules = 200
 // Normalize trims a rule and checks its syntax.
 func Normalize(rule string) (string, error) {
 	r := strings.TrimSpace(rule)
-	r = strings.TrimPrefix(r, "./")
+	neg := strings.HasPrefix(r, "!")
+	r = strings.TrimPrefix(strings.TrimPrefix(r, "!"), "./")
 	switch {
 	case r == "" || r == "/":
 		return "", errors.New("empty exclusion rule")
 	case strings.HasPrefix(r, "!"):
-		return "", fmt.Errorf("negated rules are not supported: %q", rule)
+		return "", fmt.Errorf("invalid rule %q", rule)
 	case strings.ContainsAny(r, "\n\r\x00"):
 		return "", fmt.Errorf("invalid characters in rule %q", rule)
 	}
@@ -38,6 +41,9 @@ func Normalize(rule string) (string, error) {
 		if _, err := path.Match(seg, ""); err != nil {
 			return "", fmt.Errorf("invalid pattern %q: %v", rule, err)
 		}
+	}
+	if neg {
+		r = "!" + r
 	}
 	return r, nil
 }
@@ -64,13 +70,20 @@ func NormalizeAll(rules []string) ([]string, error) {
 
 // Matcher tests paths against a list of rules.
 type Matcher struct {
-	rules [][]string // each rule split into segments; a trailing "**" marks a directory rule
+	rules []rule
+}
+
+type rule struct {
+	segs   []string // pattern segments; a trailing "**" marks a directory rule
+	negate bool
 }
 
 // New compiles rules (assumed normalized). Invalid rules are ignored.
 func New(rules []string) *Matcher {
 	m := &Matcher{}
 	for _, r := range rules {
+		negate := strings.HasPrefix(r, "!")
+		r = strings.TrimPrefix(r, "!")
 		dir := strings.HasSuffix(r, "/")
 		r = strings.Trim(r, "/")
 		if r == "" {
@@ -84,7 +97,7 @@ func New(rules []string) *Matcher {
 		if dir {
 			segs = append(segs, "**")
 		}
-		m.rules = append(m.rules, segs)
+		m.rules = append(m.rules, rule{segs: segs, negate: negate})
 	}
 	return m
 }
@@ -98,12 +111,13 @@ func (m *Matcher) Match(p string) bool {
 		return false
 	}
 	parts := strings.Split(p, "/")
+	excluded := false
 	for _, r := range m.rules {
-		if matchSegments(r, parts) {
-			return true
+		if matchSegments(r.segs, parts) {
+			excluded = !r.negate
 		}
 	}
-	return false
+	return excluded
 }
 
 // matchSegments matches path segments against pattern segments where "**"

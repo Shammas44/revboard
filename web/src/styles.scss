@@ -15,7 +15,7 @@
   --grb-attention: #bf8700;
   --grb-unreviewed: #8c959f;
   --grb-active: var(--p-primary-color);
-  --grb-focus-bg: #fff8c5;
+  --grb-note: #d4a72c;
   /* Syntax highlighting (GitHub-like) */
   --hl-keyword: #cf222e;
   --hl-title: #8250df;
@@ -39,7 +39,7 @@
     --grb-reviewed: #3fb950;
     --grb-attention: #d29922;
     --grb-unreviewed: #6e7681;
-    --grb-focus-bg: rgba(187, 128, 9, 0.3);
+    --grb-note: #e3b341;
     --hl-keyword: #ff7b72;
     --hl-title: #d2a8ff;
     --hl-constant: #79c0ff;
@@ -334,7 +334,7 @@ table.diff {
   margin-bottom: 0.4rem;
   border-radius: 6px;
   background: var(--grb-code-bg);
-  border-left: 3px solid var(--p-primary-color);
+  border-left: 3px solid var(--grb-note);
 }
 
 .note-body {
@@ -391,23 +391,53 @@ table.diff {
   outline: none;
 }
 
-/* ---- Noted and focused lines ---- */
+/* ---- Line numbers, noted and focused lines ---- */
+/* A noted line keeps its add/delete colours: it gets a yellow left border and a
+   yellow comment icon in place of the line number of the note's side. */
 table.diff {
-  tr.has-note td.num,
-  td.num.has-note {
-    box-shadow: inset 3px 0 0 var(--p-primary-color);
+  td.num .ic {
+    display: none;
+    font-size: 0.75rem;
   }
 
-  tr.focused td,
-  td.focused {
-    background: var(--grb-focus-bg) !important;
-    animation: grb-focus-flash 1.2s ease-out;
+  td.num:hover .n,
+  td.num.noted .n {
+    display: none;
+  }
+
+  td.num:hover .ic {
+    display: inline-block;
+    color: var(--p-primary-color);
+  }
+
+  td.num.noted .ic {
+    display: inline-block;
+    color: var(--grb-note);
+  }
+
+  td.num:hover {
+    text-decoration: none;
+  }
+
+  tr.marked > td:first-child,
+  &.split td.num.noted {
+    box-shadow: inset 3px 0 0 var(--grb-note);
+  }
+
+  tr.focused td.code,
+  td.code.focused {
+    animation: grb-focus-flash 1.6s ease-out;
   }
 }
 
 @keyframes grb-focus-flash {
   from {
-    box-shadow: inset 0 0 0 2px var(--grb-attention);
+    outline: 2px solid var(--grb-note);
+    outline-offset: -2px;
+  }
+  to {
+    outline: 2px solid transparent;
+    outline-offset: -2px;
   }
 }
 

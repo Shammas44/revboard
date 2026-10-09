@@ -87,11 +87,16 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
             @if (n.excerpt.length > 0) {
               <table class="excerpt" (click)="goTo(n)">
                 <caption class="mono">{{ n.hunkHeader }}</caption>
+                <colgroup><col class="c-num" /><col class="c-num" /><col /></colgroup>
                 <tbody>
                   @for (l of n.excerpt; track $index) {
                     <tr [class]="'ln-' + l.kind" [class.focus]="l.focus">
-                      <td class="num">{{ l.oldLine || '' }}</td>
-                      <td class="num">{{ l.newLine || '' }}</td>
+                      <td class="num" [class.noted]="l.focus && n.side === 'old'">
+                        @if (l.focus && n.side === 'old') {<i class="pi pi-comment"></i>} @else {{{ l.oldLine || '' }}}
+                      </td>
+                      <td class="num" [class.noted]="l.focus && n.side === 'new'">
+                        @if (l.focus && n.side === 'new') {<i class="pi pi-comment"></i>} @else {{{ l.newLine || '' }}}
+                      </td>
                       <td class="code"><span class="sign">{{ sign[l.kind] }}</span>{{ l.content }}</td>
                     </tr>
                   }
@@ -187,8 +192,10 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
         padding: 0;
         vertical-align: top;
       }
+      col.c-num {
+        width: 3rem;
+      }
       td.num {
-        width: 2.8rem;
         padding: 0 0.4rem;
         text-align: right;
         color: var(--p-text-muted-color);
@@ -209,12 +216,12 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
       tr.ln-delete td {
         background: var(--grb-del-bg);
       }
-      tr.focus td {
-        background: var(--grb-focus-bg);
-        font-weight: 600;
+      tr.focus > td:first-child {
+        box-shadow: inset 3px 0 0 var(--grb-note);
       }
-      tr.focus td.num {
-        box-shadow: inset 3px 0 0 var(--grb-attention);
+      td.num.noted .pi {
+        color: var(--grb-note);
+        font-size: 0.75rem;
       }
     }
   `,

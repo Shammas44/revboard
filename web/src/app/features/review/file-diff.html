@@ -54,8 +54,10 @@
     />
     <p-button icon="pi pi-comment" size="small" severity="secondary" [text]="true" (onClick)="addFileNote()" pTooltip="File note (c)" tooltipPosition="left" />
     <p-button icon="pi pi-history" size="small" severity="secondary" [text]="true" (onClick)="store.commitsView.set({ path: s.path })" pTooltip="File history (L)" tooltipPosition="left" />
-    @if (!f.excluded) {
-      <p-button icon="pi pi-eye-slash" size="small" severity="secondary" [text]="true" (onClick)="store.addExclusion(s.path)" pTooltip="Exclude file" tooltipPosition="left" />
+    @if (f.excluded) {
+      <p-button icon="pi pi-eye" label="Include" size="small" severity="warn" [outlined]="true" (onClick)="store.toggleFileExclusion(f)" pTooltip="Include file" tooltipPosition="left" />
+    } @else {
+      <p-button icon="pi pi-eye-slash" size="small" severity="secondary" [text]="true" (onClick)="store.toggleFileExclusion(f)" pTooltip="Exclude file" tooltipPosition="left" />
     }
   </div>
 </header>

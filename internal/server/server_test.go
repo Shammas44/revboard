@@ -253,7 +253,7 @@ func TestExclusionsAndCommits(t *testing.T) {
 	if excluded != 1 || len(detail.Files) != 2 {
 		t.Fatalf("excluded flags: %+v", detail.Files)
 	}
-	if rec := f.do("PATCH", "/api/sessions/"+sid, map[string]any{"exclusions": []string{"!x"}}, nil); rec.Code != http.StatusBadRequest {
+	if rec := f.do("PATCH", "/api/sessions/"+sid, map[string]any{"exclusions": []string{"a[.go"}}, nil); rec.Code != http.StatusBadRequest {
 		t.Fatalf("invalid rule: status %d", rec.Code)
 	}
 	f.do("PATCH", "/api/sessions/"+sid, map[string]any{"name": "renamed"}, &se)

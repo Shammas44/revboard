@@ -371,7 +371,11 @@ never touches review state. Syntax:
 | `src/gen/`, `src/*.go` | contains a slash: matched from the repository root |
 | `**/*.snap`, `src/**/test_*.py` | `**` matches any number of directories |
 
-Negations (`!x`) are refused; at most 200 rules per session. `FileSummary.excluded` is computed
+| `!src/api/keep.go` | re-includes a path excluded by an earlier rule |
+
+As with gitignore, rules apply in order and the **last matching rule wins**. The file header
+toggle *Exclude / Include* edits the rules: including removes the file's own rule when present,
+otherwise appends `!path`. At most 200 rules per session. `FileSummary.excluded` is computed
 by the server; `Progress` totals ignore excluded files and `Progress.excludedFiles` counts them.
 
 ### 8.6 Commit range

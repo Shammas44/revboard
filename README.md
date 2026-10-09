@@ -197,7 +197,9 @@ highlighted.
 ### Notes
 
 Click a **line number** in the diff to attach a private note to that line (old side for deleted
-lines, new side otherwise). Lines carrying a note are marked in the gutter. `c` adds a note on the
+lines, new side otherwise). Hovering a line number turns it into a comment icon. A line carrying
+a note keeps its colours and gets a yellow left border, with a yellow comment icon in place of its
+line number. `c` adds a note on the
 whole file, and the *Notes* drawer (`N`) holds the session notes.
 
 The *Notes* drawer also lists **every note of the review**, grouped by file. Each line note is
@@ -225,6 +227,7 @@ navigation and are not counted in the progress. Their statuses and notes are kep
 | `docs/` | every directory named `docs` |
 | `src/gen/` | that directory (a rule containing a slash starts at the repository root) |
 | `**/*.snap` | `**` matches any number of directories |
+| `!docs/keep.md` | re-includes a file excluded by an earlier rule (the last matching rule wins) |
 
 ```bash
 revboard review exclude '*.lock' 'docs/' '**/__snapshots__/'
@@ -232,8 +235,9 @@ revboard review exclude --remove 'docs/'
 revboard review exclude            # list the rules
 ```
 
-In the UI: toolbar *Excluded files* button (`e`), the eye icon of a file header, or the eye icon
-shown when hovering a folder.
+In the UI: toolbar *Excluded files* button (`e`), the eye icon shown when hovering a folder, or
+the *Exclude / Include* toggle of a file header. Including a file excluded by a broader rule (e.g.
+`*.lock`) adds a `!path` rule for it.
 
 > Exclusion rules filter a captured session. To keep files out of the capture itself, use a git
 > pathspec in the command: `"git diff main feat -- ':(exclude)*.md'"`.

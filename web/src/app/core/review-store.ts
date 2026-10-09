@@ -339,8 +339,11 @@ export class ReviewStore {
     }
     const wanted = restoreUi ? ui.selectedFileId : this.selectedFileId();
     const byId = this.fileById();
-    const keep = wanted != null && byId.has(wanted) && (!byId.get(wanted)!.excluded || this.filter() === 'excluded');
-    const selected = keep ? wanted : (this.fileOrder()[0]?.id ?? null);
+    if (this.filter() === 'excluded' && this.excludedCount() === 0) {
+      this.filter.set('all');
+    }
+    // The open file stays open even when it becomes excluded (it shows an "excluded" tag).
+    const selected = wanted != null && byId.has(wanted) ? wanted : (this.fileOrder()[0]?.id ?? null);
     this.selectedFileId.set(null); // force a reload of the detail
     this.selectFile(selected);
   }
@@ -398,6 +401,25 @@ export class ReviewStore {
         },
         error: (err) => this.error('Could not save the exclusion rules', err),
       });
+  }
+
+  /**
+   * Excludes or re-includes one file. Re-including removes the file's own rule
+   * when there is one, otherwise adds a "!path" rule overriding broader rules.
+   */
+  toggleFileExclusion(file: FileVM): void {
+    const path = file.summary.path;
+    const rules = this.session()?.exclusions ?? [];
+    let next: string[];
+    let message: string;
+    if (file.excluded) {
+      next = rules.includes(path) ? rules.filter((r) => r !== path) : [...rules.filter((r) => r !== `!${path}`), `!${path}`];
+      message = `${path} is part of the review again.`;
+    } else {
+      next = rules.includes(`!${path}`) ? rules.filter((r) => r !== `!${path}`) : [...rules.filter((r) => r !== path), path];
+      message = `${path} is excluded from the review.`;
+    }
+    this.setExclusions(next, () => this.toast.add({ severity: 'info', summary: file.excluded ? 'Included' : 'Excluded', detail: message, life: 2500 }));
   }
 
   /** Adds one exclusion rule (e.g. a folder from the tree). */
