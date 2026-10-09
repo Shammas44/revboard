@@ -73,6 +73,7 @@ export class ReviewStore {
   readonly search = signal('');
   readonly collapseReviewed = signal(false);
   readonly diffMode = signal<DiffMode>('unified');
+  readonly syntaxHighlight = signal(true);
   readonly collapsedDirs = signal<ReadonlySet<string>>(new Set());
   readonly selectedFileId = signal<number | null>(null);
   readonly activeHunkId = signal<number | null>(null);
@@ -296,6 +297,7 @@ export class ReviewStore {
       filter: this.filter(),
       collapseReviewed: this.collapseReviewed(),
       diffMode: this.diffMode(),
+      syntaxHighlight: this.syntaxHighlight(),
     };
   }
 
@@ -333,6 +335,7 @@ export class ReviewStore {
       this.filter.set(ui.filter ?? 'all');
       this.collapseReviewed.set(ui.collapseReviewed ?? false);
       this.diffMode.set(ui.diffMode ?? 'unified');
+      this.syntaxHighlight.set(ui.syntaxHighlight ?? true);
     }
     const wanted = restoreUi ? ui.selectedFileId : this.selectedFileId();
     const byId = this.fileById();

@@ -1,11 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { DiffLine, Hunk, NoteAnchor, Side } from '../../core/models';
 import { anchorKey, ReviewStore } from '../../core/review-store';
+import { highlightHunk } from '../../core/syntax';
 import { NoteThread } from './note-thread';
 
 /** One displayed line with the anchor its notes are attached to. */
 interface Cell {
   line: DiffLine;
+  /** Position of the line in the hunk. */
+  index: number;
   side: Side;
   number: number;
   key: string;
@@ -38,7 +41,7 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
             <tr [class]="'ln-' + c.line.kind" [class.focused]="focusAnchor() === c.side + ':' + c.number" [class.has-note]="notesByKey().has(c.key)" [attr.data-anchor]="c.side + ':' + c.number">
               <td class="num" (click)="compose(c)">{{ c.line.oldLine || '' }}</td>
               <td class="num" (click)="compose(c)">{{ c.line.newLine || '' }}</td>
-              <td class="code"><span class="sign">{{ sign[c.line.kind] }}</span>{{ c.line.content }}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
+              <td class="code"><span class="sign">{{ sign[c.line.kind] }}</span>@if (html(); as h) {<span [innerHTML]="h[c.index]"></span>} @else {{{ c.line.content }}}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
             </tr>
             @let notes = notesByKey().get(c.key);
             @if (notes || composingKey() === c.key) {
@@ -57,14 +60,14 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
             <tr>
               @if (r.left; as c) {
                 <td class="num" [class]="cellClass(c)" (click)="compose(c)" [attr.data-anchor]="c.side + ':' + c.number">{{ c.line.oldLine }}</td>
-                <td class="code" [class]="cellClass(c)"><span class="sign">{{ sign[c.line.kind] }}</span>{{ c.line.content }}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
+                <td class="code" [class]="cellClass(c)"><span class="sign">{{ sign[c.line.kind] }}</span>@if (html(); as h) {<span [innerHTML]="h[c.index]"></span>} @else {{{ c.line.content }}}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
               } @else {
                 <td class="num empty"></td>
                 <td class="code empty"></td>
               }
               @if (r.right; as c) {
                 <td class="num" [class]="cellClass(c)" (click)="compose(c)" [attr.data-anchor]="c.side + ':' + c.number">{{ c.line.newLine }}</td>
-                <td class="code" [class]="cellClass(c)"><span class="sign">{{ sign[c.line.kind] }}</span>{{ c.line.content }}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
+                <td class="code" [class]="cellClass(c)"><span class="sign">{{ sign[c.line.kind] }}</span>@if (html(); as h) {<span [innerHTML]="h[c.index]"></span>} @else {{{ c.line.content }}}@if (c.line.noNewline) {<span class="eof" title="No newline at end of file">⏎̸</span>}</td>
               } @else {
                 <td class="num empty"></td>
                 <td class="code empty"></td>
@@ -96,10 +99,10 @@ export class HunkLines {
   /** Notes are anchored on the new side, except for deleted lines. */
   protected readonly cells = computed<Cell[]>(() => {
     const path = this.path();
-    return this.hunk().lines.map((line) => {
+    return this.hunk().lines.map((line, index) => {
       const side: Side = line.kind === 'delete' ? 'old' : 'new';
       const number = side === 'old' ? line.oldLine : line.newLine;
-      return { line, side, number, key: anchorKey(path, side, number) };
+      return { line, index, side, number, key: anchorKey(path, side, number) };
     });
   });
 
@@ -133,6 +136,11 @@ export class HunkLines {
   });
 
   protected readonly notesByKey = this.store.commentsByAnchor;
+
+  /** Highlighted HTML per line (escaped by highlight.js), or null when disabled/unsupported. */
+  protected readonly html = computed(() =>
+    this.store.syntaxHighlight() ? highlightHunk(this.path(), this.hunk().lines) : null,
+  );
 
   protected readonly composingKey = computed(() => {
     const c = this.store.composer();

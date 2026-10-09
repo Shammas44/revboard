@@ -172,12 +172,27 @@ hunks are, and *Needs attention* as soon as one hunk is.
 | `N` | All notes (session, file and line notes with their code) |
 | `z` | Toggle "collapse reviewed hunks" |
 | `v` | Switch unified / split diff |
+| `h` | Toggle syntax highlighting |
 | `l` / `L` | Commits of the review / commits touching the current file |
 | `e` | Excluded files |
 | `/` | Search files |
 | `?` | Help |
 
 In a note editor: `Ctrl+Enter` saves, `Esc` cancels.
+
+### Syntax highlighting (experimental)
+
+Diff lines are coloured with [highlight.js](https://highlightjs.org/) for about 25 languages
+(Go, TypeScript/JavaScript, Python, Java, Kotlin, C/C++, C#, Rust, PHP, Ruby, Swift, SQL, shell,
+HTML/XML, CSS/SCSS/Less, JSON, YAML, Markdown, Dockerfile, Makefile, INI/TOML…), detected from the
+file extension. The palette button in the toolbar (or `h`) turns it off; the choice is saved per
+session.
+
+Each side of a hunk (old: context + deleted lines, new: context + added lines) is highlighted as
+one block, so comments and strings spanning several lines keep their colours. A hunk starts in the
+middle of a file, so a construct opened *before* the hunk (e.g. a long block comment) may be
+coloured incorrectly. Hunks over 3 000 lines and minified lines (over 2 000 characters) are not
+highlighted.
 
 ### Notes
 

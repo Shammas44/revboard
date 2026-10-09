@@ -87,6 +87,7 @@ export class ReviewPage {
     { keys: 'N', action: 'All notes, with their code' },
     { keys: 'z', action: 'Toggle "collapse reviewed hunks"' },
     { keys: 'v', action: 'Switch unified / split diff' },
+    { keys: 'h', action: 'Toggle syntax highlighting' },
     { keys: 'l', action: 'Commits of the review' },
     { keys: 'L', action: 'Commits touching the file' },
     { keys: 'e', action: 'Excluded files' },
@@ -169,6 +170,9 @@ export class ReviewPage {
           return true;
         case 'z':
           s.collapseReviewed.update((v) => !v);
+          return true;
+        case 'h':
+          s.syntaxHighlight.update((v) => !v);
           return true;
         case 'v':
           s.diffMode.update((m) => (m === 'unified' ? 'split' : 'unified'));

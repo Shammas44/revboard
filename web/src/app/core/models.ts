@@ -129,6 +129,7 @@ export interface UiState {
   filter?: FileFilter;
   collapseReviewed?: boolean;
   diffMode?: DiffMode;
+  syntaxHighlight?: boolean;
 }
 
 export interface CommitFile {

@@ -64,6 +64,14 @@
         pTooltip="Diff view (v)"
         tooltipPosition="left"
       />
+      <p-button
+        icon="pi pi-palette"
+        [text]="!store.syntaxHighlight()"
+        [severity]="store.syntaxHighlight() ? 'info' : 'secondary'"
+        (onClick)="store.syntaxHighlight.update((v) => !v)"
+        pTooltip="Syntax colors (h)"
+        tooltipPosition="left"
+      />
       <label class="collapse-toggle small" pTooltip="Collapse reviewed (z)" tooltipPosition="left">
         <p-toggleswitch [ngModel]="store.collapseReviewed()" (ngModelChange)="store.collapseReviewed.set($event)" />
         Collapse reviewed
