@@ -242,8 +242,10 @@ export class ReviewPage {
     const s = this.store;
     const hunkId = s.activeHunkId();
     const file = s.selectedFile();
-    if (hunkId != null && file?.hunks.some((h) => h.id === hunkId)) {
-      s.setHunkStatus(hunkId, status);
+    const hunk = file?.hunks.find((h) => h.id === hunkId);
+    if (hunk) {
+      // Already in that state (e.g. marked with the mouse): only move on.
+      if (hunk.status() !== status) s.setHunkStatus(hunk.id, status);
       if (advance) s.moveHunk(1);
     } else if (file) {
       // Files without hunks (binary, renames) carry their status themselves.

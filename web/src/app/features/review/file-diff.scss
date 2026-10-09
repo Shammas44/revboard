@@ -13,10 +13,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.6rem 0.25rem;
+  /* Spans the side padding of the scroll container so that hunks scrolling
+     underneath (including the active hunk ring) are fully hidden. */
+  margin: 0 -0.75rem 0.75rem;
+  padding: 0.6rem 1rem;
   background: var(--p-content-background);
   border-bottom: 1px solid var(--p-content-border-color);
-  margin-bottom: 0.75rem;
 }
 
 .path-line {
