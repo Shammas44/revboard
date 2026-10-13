@@ -40,7 +40,9 @@ export class Autofocus {
         } @else {
           <div class="note-body">{{ n.body }}</div>
           <div class="note-meta">
-            <span class="note-number" title="Note number, also used in the Markdown export">#{{ n.number }}</span>
+            @if (showNumber()) {
+              <span class="note-number" title="Note number, also used in the Markdown export">#{{ n.number }}</span>
+            }
             @if (exportable()) {
               <label class="export-toggle" title="Include this note in the Markdown export">
                 <p-checkbox [binary]="true" [ngModel]="n.export" (ngModelChange)="store.setNoteExport(n, $event)" />
@@ -91,6 +93,8 @@ export class NoteThread {
   /** Keep the composer open (session notes dialog). */
   readonly alwaysCompose = input(false);
   readonly allowReply = input(true);
+  /** Show the note number (hidden when the container already displays it). */
+  readonly showNumber = input(true);
   /** Show the "export" checkbox of each note (notes panel). */
   readonly exportable = input(false);
 

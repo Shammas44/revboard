@@ -154,7 +154,7 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
               </table>
               </div>
             }
-            <grb-note-thread [notes]="[commentById().get(n.id) ?? n]" [anchor]="{ filePath: n.filePath, side: n.side, line: n.line }" [allowReply]="false" [exportable]="true" />
+            <grb-note-thread [notes]="[commentById().get(n.id) ?? n]" [anchor]="{ filePath: n.filePath, side: n.side, line: n.line }" [allowReply]="false" [exportable]="true" [showNumber]="false" />
           </article>
         }
       </section>
