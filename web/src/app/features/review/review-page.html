@@ -136,7 +136,7 @@
   styleClass="grb-drawer"
 >
   @if (showNotes()) {
-    <grb-notes-panel (navigated)="showNotes.set(false)" />
+    <grb-notes-panel [focusJump]="jumpToNote()" (navigated)="showNotes.set(false)" />
   }
 </p-drawer>
 

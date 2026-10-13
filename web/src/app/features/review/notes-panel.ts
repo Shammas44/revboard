@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, computed, inject, output, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, afterNextRender, afterRenderEffect, computed, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
@@ -30,6 +30,30 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
   selector: 'grb-notes-panel',
   imports: [FormsModule, Button, IconField, InputIcon, InputText, Tag, NoteThread, ClearButton],
   template: `
+    <div class="top-bar">
+    <div class="jump-row">
+      <label for="grb-jump" class="jump-label"><i class="pi pi-hashtag"></i> Go to note</label>
+      <span class="clearable jump-input">
+        <input
+          #jump
+          id="grb-jump"
+          pInputText
+          pSize="small"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="#"
+          [ngModel]="jumpQuery()"
+          (ngModelChange)="jumpQuery.set($event); jumpError.set('')"
+          (keydown)="onJumpKey($event)"
+        />
+        <grb-clear-button [visible]="!!jumpQuery()" (cleared)="jumpQuery.set(''); jumpError.set('')" />
+      </span>
+      @if (jumpError(); as err) {
+        <span class="jump-error small">{{ err }}</span>
+      } @else {
+        <span class="muted small">Enter: show here · Shift+Enter: open in the diff · <kbd>g</kbd> from anywhere</span>
+      }
+    </div>
     <div class="export-bar">
       <span class="export-summary">
         <i class="pi pi-file-export"></i>
@@ -38,6 +62,7 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
       <p-button label="All" size="small" [text]="true" (onClick)="store.setAllNotesExport(true)" [disabled]="exportCount() === store.comments().length" />
       <p-button label="None" size="small" [text]="true" (onClick)="store.setAllNotesExport(false)" [disabled]="exportCount() === 0" />
       <p-button label="Copy as Markdown" icon="pi pi-copy" size="small" (onClick)="store.copyNotesExport()" [disabled]="exportCount() === 0" />
+    </div>
     </div>
     <p class="muted small export-help">
       The export is a Markdown document listing the checked notes with their file, line and code context, ready to
@@ -83,8 +108,9 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
           }
         </header>
         @for (n of g.notes; track n.id) {
-          <article class="note-card" [class.not-exported]="!(commentById().get(n.id) ?? n).export">
+          <article class="note-card" [class.not-exported]="!(commentById().get(n.id) ?? n).export" [attr.data-note]="n.number">
             <div class="where small">
+              <span class="card-number note-number">#{{ n.number }}</span>
               @if (n.line === 0) {
                 <span class="muted">File note</span>
               } @else {
@@ -142,10 +168,37 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
       font-size: 0.95rem;
       margin: 0 0 0.5rem;
     }
-    .export-bar {
+    .top-bar {
       position: sticky;
       top: 0;
       z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      padding-bottom: 0.4rem;
+      background: var(--p-content-background);
+    }
+    .jump-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .jump-label {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .jump-input input {
+      width: 6rem;
+      font-family: var(--grb-mono);
+    }
+    .jump-error {
+      color: var(--grb-del-fg);
+    }
+    .card-number {
+      font-size: 0.95rem;
+    }
+    .export-bar {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
@@ -310,6 +363,13 @@ export class NotesPanel {
 
   protected readonly sign = SIGN;
   protected readonly query = signal('');
+  protected readonly jumpQuery = signal('');
+  protected readonly jumpError = signal('');
+
+  /** Focus the "Go to note" field when the panel opens (shortcut "g"). */
+  readonly focusJump = input(false);
+  private readonly jumpInput = viewChild<ElementRef<HTMLInputElement>>('jump');
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   /** Reloaded whenever notes are added, edited or deleted. */
   protected readonly state = toSignal(
@@ -329,12 +389,14 @@ export class NotesPanel {
   );
 
   constructor() {
+    afterNextRender(() => {
+      if (this.focusJump()) this.jumpInput()?.nativeElement.focus();
+    });
     // Center each excerpt on its noted line (scrolls the excerpt box only).
-    const host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
     afterRenderEffect(() => {
       this.groups();
       untracked(() => {
-        for (const box of Array.from(host.querySelectorAll<HTMLElement>('.excerpt-scroll'))) {
+        for (const box of Array.from(this.host.querySelectorAll<HTMLElement>('.excerpt-scroll'))) {
           const row = box.querySelector<HTMLElement>('tr.focus');
           if (row) box.scrollTop = row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2;
         }
@@ -363,6 +425,53 @@ export class NotesPanel {
     }
     return groups;
   });
+
+  /** Enter: scroll to the note in the panel; Shift+Enter: open it in the diff. */
+  protected onJumpKey(e: KeyboardEvent): void {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const number = Number(this.jumpQuery().trim().replace(/^#/, ''));
+    if (!Number.isInteger(number) || number <= 0) {
+      this.jumpError.set('Type a note number, e.g. 12');
+      return;
+    }
+    const note = this.state().notes.find((n) => n.number === number);
+    if (!note) {
+      this.jumpError.set(`No note #${number} in this review`);
+      return;
+    }
+    if (e.shiftKey && note.filePath !== '') {
+      if (note.line > 0 && !note.outdated && note.fileId) {
+        this.goTo(note);
+        return;
+      }
+      const group = this.groups().find((g) => g.path === note.filePath);
+      if (group?.fileId) {
+        this.openFile(group);
+        return;
+      }
+    }
+    this.reveal(number);
+  }
+
+  /** Scrolls the panel to a note card and highlights it (clears a filter hiding it). */
+  private reveal(number: number): void {
+    const find = () =>
+      this.host.querySelector<HTMLElement>(`.note-card[data-note="${number}"]`) ??
+      this.host.querySelector<HTMLElement>(`.session-notes .note[data-note="${number}"]`);
+    if (!find() && this.query()) {
+      this.query.set('');
+    }
+    // Let a cleared filter render the card first.
+    setTimeout(() => {
+      const el = find();
+      if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.remove('flash');
+      void el.offsetWidth; // restart the animation
+      el.classList.add('flash');
+    });
+  }
 
   protected goTo(n: NoteContext): void {
     if (!n.fileId || n.outdated) return;

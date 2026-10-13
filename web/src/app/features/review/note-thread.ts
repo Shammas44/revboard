@@ -27,7 +27,7 @@ export class Autofocus {
   imports: [DatePipe, FormsModule, Button, Checkbox, Textarea, Autofocus, ClearButton],
   template: `
     @for (n of notes(); track n.id) {
-      <div class="note" [class.not-exported]="exportable() && !n.export">
+      <div class="note" [class.not-exported]="exportable() && !n.export" [attr.data-note]="n.number">
         @if (editingId() === n.id) {
           <div class="clearable multiline">
             <textarea pTextarea [autoResize]="true" rows="2" [(ngModel)]="editDraft" (keydown)="editKey($event, n)" class="w-full" grbAutofocus></textarea>
@@ -40,6 +40,7 @@ export class Autofocus {
         } @else {
           <div class="note-body">{{ n.body }}</div>
           <div class="note-meta">
+            <span class="note-number" title="Note number, also used in the Markdown export">#{{ n.number }}</span>
             @if (exportable()) {
               <label class="export-toggle" title="Include this note in the Markdown export">
                 <p-checkbox [binary]="true" [ngModel]="n.export" (ngModelChange)="store.setNoteExport(n, $event)" />

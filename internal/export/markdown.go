@@ -45,7 +45,8 @@ func Markdown(se store.Session, notes []store.NoteContext, opt Options) string {
 	w("# Code review: requested changes\n\n")
 	w("The notes below come from a code review. Each note describes a change to make in the\n")
 	w("repository. Apply every note at the location it gives, then check the result builds and\n")
-	w("its tests pass. Notes are numbered so that you can report on each of them.\n\n")
+	w("its tests pass. Each note has a number (#N) that stays the same across exports: refer to\n")
+	w("notes by this number when you report on them.\n\n")
 
 	w("## Review context\n\n")
 	w("- Repository root: `%s`\n", se.RepoPath)
@@ -75,12 +76,10 @@ func Markdown(se store.Session, notes []store.NoteContext, opt Options) string {
 		return b.String()
 	}
 
-	number := 0
 	if len(general) > 0 {
 		w("\n## General notes\n\nThese apply to the whole change.\n")
 		for _, n := range general {
-			number++
-			w("\n### %d. General note\n\n%s\n", number, quote(n.Body))
+			w("\n### Note #%d (general)\n\n%s\n", n.Number, quote(n.Body))
 		}
 	}
 
@@ -94,8 +93,8 @@ func Markdown(se store.Session, notes []store.NoteContext, opt Options) string {
 			w("\n### File `%s`\n\n", n.FilePath)
 			w("%s\n", fileState(n))
 		}
-		number++
-		w("\n#### %d. %s\n\n", number, title(n))
+		number := n.Number
+		w("\n#### Note #%d: %s\n\n", number, title(n))
 		w("- Location: %s\n", location(n))
 		if n.Line > 0 && !n.Outdated {
 			if l, ok := focusLine(n); ok {
@@ -108,12 +107,12 @@ func Markdown(se store.Session, notes []store.NoteContext, opt Options) string {
 			if n.HunkSection != "" {
 				header += " " + n.HunkSection
 			}
-			w("\nCode context (diff of the reviewed change, noted line marked with `◀ note %d`):\n\n", number)
+			w("\nCode context (diff of the reviewed change, noted line marked with `◀ note #%d`):\n\n", number)
 			w("```diff\n%s\n", header)
 			for _, l := range lines {
 				line := sign(string(l.Kind)) + l.Content
 				if l.Focus {
-					line += "    ◀ note " + fmt.Sprint(number)
+					line += "    ◀ note #" + fmt.Sprint(number)
 				}
 				w("%s\n", line)
 			}

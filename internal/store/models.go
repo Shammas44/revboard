@@ -130,12 +130,14 @@ type FileDetail struct {
 
 // Comment is a private note on a session, a file or a line.
 type Comment struct {
-	ID        int64  `json:"id"`
-	SessionID int64  `json:"sessionId"`
-	FilePath  string `json:"filePath"`
-	Side      string `json:"side"`
-	Line      int    `json:"line"`
-	Body      string `json:"body"`
+	ID        int64 `json:"id"`
+	SessionID int64 `json:"sessionId"`
+	// Number identifies the note within its session (#1, #2, ...); it is never reused.
+	Number   int    `json:"number"`
+	FilePath string `json:"filePath"`
+	Side     string `json:"side"`
+	Line     int    `json:"line"`
+	Body     string `json:"body"`
 	// Export marks the note for the Markdown export (default true).
 	Export    bool      `json:"export"`
 	CreatedAt time.Time `json:"createdAt"`

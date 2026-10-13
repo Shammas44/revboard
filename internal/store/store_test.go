@@ -379,3 +379,37 @@ func TestNotesDriveStatuses(t *testing.T) {
 		t.Fatal("SetCommentsExport should mark every note")
 	}
 }
+
+func TestNoteNumbers(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	_, d := newSession(t, s, sampleDiff)
+	add := func(body string) Comment {
+		t.Helper()
+		created, err := s.CreateComment(ctx, Comment{SessionID: d.Session.ID, Body: body})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return created.Comment
+	}
+	a, b := add("a"), add("b")
+	if a.Number != 1 || b.Number != 2 {
+		t.Fatalf("numbers = %d, %d", a.Number, b.Number)
+	}
+	// Numbers are never reused, even after deleting the last note.
+	if err := s.DeleteComment(ctx, b.ID); err != nil {
+		t.Fatal(err)
+	}
+	if c := add("c"); c.Number != 3 {
+		t.Fatalf("number after deletion = %d, want 3", c.Number)
+	}
+	// Numbering is per session.
+	id, err := s.CreateSession(ctx, NewSession{ProjectID: d.Session.ProjectID, Name: "other", GitArgs: []string{"diff"}, WorkDir: "/x"}, parse(t, sampleDiff))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, _ := s.CreateComment(ctx, Comment{SessionID: id, Body: "first"})
+	if created.Comment.Number != 1 {
+		t.Fatalf("other session starts at %d", created.Comment.Number)
+	}
+}

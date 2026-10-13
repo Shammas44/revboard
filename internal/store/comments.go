@@ -11,14 +11,14 @@ import (
 func scanComment(row interface{ Scan(...any) error }) (Comment, error) {
 	var c Comment
 	var created, updated string
-	if err := row.Scan(&c.ID, &c.SessionID, &c.FilePath, &c.Side, &c.Line, &c.Body, &c.Export, &created, &updated); err != nil {
+	if err := row.Scan(&c.ID, &c.SessionID, &c.Number, &c.FilePath, &c.Side, &c.Line, &c.Body, &c.Export, &created, &updated); err != nil {
 		return c, err
 	}
 	c.CreatedAt, c.UpdatedAt = parseTime(created), parseTime(updated)
 	return c, nil
 }
 
-const commentColumns = `id, session_id, file_path, side, line, body, export, created_at, updated_at`
+const commentColumns = `id, session_id, number, file_path, side, line, body, export, created_at, updated_at`
 
 // listComments returns the notes of a session, optionally restricted to one file path.
 func listComments(ctx context.Context, q dbtx, sessionID int64, path *string) ([]Comment, error) {
@@ -77,8 +77,15 @@ func (s *Store) CreateComment(ctx context.Context, c Comment) (NoteCreated, erro
 	}
 	var out NoteCreated
 	err := s.tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `INSERT INTO comments(session_id, file_path, side, line, body) VALUES (?, ?, ?, ?, ?)`,
-			c.SessionID, c.FilePath, c.Side, c.Line, c.Body)
+		var number int
+		if err := tx.QueryRowContext(ctx, `SELECT next_note_number FROM review_sessions WHERE id = ?`, c.SessionID).Scan(&number); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE review_sessions SET next_note_number = ? WHERE id = ?`, number+1, c.SessionID); err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx, `INSERT INTO comments(session_id, number, file_path, side, line, body) VALUES (?, ?, ?, ?, ?, ?)`,
+			c.SessionID, number, c.FilePath, c.Side, c.Line, c.Body)
 		if err != nil {
 			return err
 		}

@@ -62,6 +62,8 @@ export class ReviewPage {
 
   readonly showHelp = signal(false);
   readonly showNotes = signal(false);
+  /** The notes drawer was opened with "g": focus its "Go to note" field. */
+  readonly jumpToNote = signal(false);
   readonly showExclusions = signal(false);
   /** Common size of the right drawers (notes, commits, exclusions, shortcuts). */
   readonly drawerStyle = { width: 'min(1200px, 85vw)' };
@@ -103,6 +105,7 @@ export class ReviewPage {
     { keys: 's', action: 'Pin / unpin the file' },
     { keys: 'c', action: 'Add a note on the file' },
     { keys: 'N', action: 'All notes, with their code' },
+    { keys: 'g', action: 'Go to a note by its number (#N)' },
     { keys: 'z', action: 'Toggle "collapse reviewed hunks"' },
     { keys: 'v', action: 'Switch unified / split diff' },
     { keys: 'h', action: 'Toggle syntax highlighting' },
@@ -184,6 +187,11 @@ export class ReviewPage {
           return true;
         }
         case 'N':
+          this.jumpToNote.set(false);
+          this.showNotes.set(true);
+          return true;
+        case 'g':
+          this.jumpToNote.set(true);
           this.showNotes.set(true);
           return true;
         case 'z':

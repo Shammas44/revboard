@@ -67,6 +67,7 @@ database and serves a local web UI to work through it, across days and across pr
 | FR-18 | Adding a line note marks its hunk *needs attention*; a file note marks its file *needs attention* (kept while the file note exists). Deleting a note does not change statuses. |
 | FR-19 | A reviewed hunk/file holds no note: marking reviewed an item with notes requires a confirmation and deletes its notes (hunk: line notes on its lines; file/folder: all notes of the files). The API refuses with `409 {noteCount}` unless `deleteNotes: true`. |
 | FR-20 | Each note has an *export* flag (default true). The checked notes are exported as Markdown for an LLM or a developer to implement them (UI *Copy as Markdown*, `review notes --markdown`, `GET /api/sessions/{id}/notes/export`). |
+| FR-21 | Notes are numbered per session (`#1`, `#2`, …, assigned at creation, never reused). The number is shown in the diff, the notes drawer and the export. *Go to note* (`g`) scrolls to a note by number (Enter) or opens its line in the diff (Shift+Enter). |
 | FR-17 | All notes can be retrieved in one place (UI *Notes* drawer, `revboard review notes [--markdown]`), each line note with its whole hunk (scrolled to the noted line, which is marked; the CLI prints `--context` lines around it, default 3); "go to line" opens the file, expands the hunk and highlights the line in the diff. |
 
 ## 5. Non-functional requirements
@@ -346,6 +347,14 @@ ALTER TABLE review_sessions ADD COLUMN exclusions TEXT NOT NULL DEFAULT '[]';
 ```sql
 -- Notes can be left out of the Markdown export (all notes are exported by default).
 ALTER TABLE comments ADD COLUMN export INTEGER NOT NULL DEFAULT 1;
+```
+
+### 8.2.3 Migration 0004 — note numbers
+
+```sql
+ALTER TABLE comments ADD COLUMN number INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE review_sessions ADD COLUMN next_note_number INTEGER NOT NULL DEFAULT 1;
+-- Existing notes are numbered in creation order; the counter starts after the highest number.
 ```
 
 ### 8.3 Status rules (enforced by the backend in a single transaction)
@@ -812,6 +821,7 @@ Measured on a 3 000-file / 9 000-hunk diff (headless Chromium): capture 0.4 s, s
 | `l` / `L` | commits of the review / commits touching the current file |
 | `e` | excluded files (right drawer) |
 | `/` | focus file search |
+| `g` | go to a note by number (`#N`) |
 | `?` | shortcut help (right drawer) |
 
 ## 12. Error handling

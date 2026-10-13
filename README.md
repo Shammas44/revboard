@@ -170,6 +170,7 @@ hunks are, and *Needs attention* as soon as one hunk is.
 | `s` | Pin / unpin file |
 | `c` | Add a note on the file |
 | `N` | All notes (session, file and line notes with their code) |
+| `g` | Go to a note by its number (`#N`) |
 | `z` | Toggle "collapse reviewed hunks" |
 | `v` | Switch unified / split diff |
 | `h` | Toggle syntax highlighting |
@@ -214,6 +215,12 @@ The *Notes* drawer also lists **every note of the review**, grouped by file. Eac
 shown with its whole hunk, scrolled to the noted line, which is marked. *Go to line* opens the file,
 expands the hunk if it was collapsed, scrolls to the line and highlights it. A filter box searches
 note texts and paths. Notes whose line disappeared after a refresh are marked *outdated*.
+
+**Note numbers.** Every note gets a number in its review (`#1`, `#2`, …), shown in the diff, in
+the *Notes* drawer and in the export. Numbers never change and are never reused, so you can discuss
+"note #7" with an LLM across several exports. To jump to a note, press `g` (or use the *Go to note*
+field of the *Notes* drawer), type its number and press **Enter** to show it in the drawer, or
+**Shift+Enter** to open its line in the diff.
 
 **Exporting notes for an LLM.** Every note has an *Export* checkbox in the *Notes* drawer
 (checked by default; *All* / *None* change them all). *Copy as Markdown* copies a structured

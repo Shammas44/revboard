@@ -595,3 +595,25 @@ table.diff {
   display: flex;
   flex-direction: column;
 }
+
+/* ---- Note numbers (#N, shared with the Markdown export) ---- */
+.note-number {
+  font-family: var(--grb-mono);
+  font-weight: 700;
+  color: var(--grb-note);
+}
+
+/* Note reached with "Go to note": brief highlight. */
+.note-card.flash,
+.note.flash {
+  animation: grb-note-flash 1.8s ease-out;
+}
+
+@keyframes grb-note-flash {
+  from {
+    box-shadow: 0 0 0 3px var(--grb-note);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}

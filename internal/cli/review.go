@@ -527,7 +527,7 @@ func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, cont
 		if !n.Export {
 			where += ", not exported"
 		}
-		fmt.Fprintf(out, "\n  [%s]\n", where)
+		fmt.Fprintf(out, "\n  #%d [%s]\n", n.Number, where)
 		if excerpt := excerptWindow(n.Excerpt, context); len(excerpt) > 0 {
 			fmt.Fprintf(out, "    %s\n", n.HunkHeader)
 			for _, l := range excerpt {

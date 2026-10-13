@@ -102,6 +102,8 @@ export interface Hunk {
 export interface Comment {
   id: number;
   sessionId: number;
+  /** Stable number of the note in its session (#1, #2, ...), never reused. */
+  number: number;
   filePath: string;
   side: Side;
   line: number;
