@@ -117,33 +117,33 @@ func TestStatusRules(t *testing.T) {
 	}
 	code, bin := d.Files[0], d.Files[1]
 
-	sc, err := s.SetHunkStatus(ctx, code.Hunks[0].ID, StatusReviewed)
+	sc, err := s.SetHunkStatus(ctx, code.Hunks[0].ID, StatusReviewed, StatusOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if sc.Files[0].Status != StatusUnreviewed || sc.Progress.ReviewedHunks != 1 {
 		t.Fatalf("after one hunk: %+v", sc)
 	}
-	sc, _ = s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusReviewed)
+	sc, _ = s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusReviewed, StatusOptions{})
 	if sc.Files[0].Status != StatusReviewed || sc.Progress.ReviewedFiles != 1 {
 		t.Fatalf("after all hunks: %+v", sc)
 	}
-	sc, _ = s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusNeedsAttention)
+	sc, _ = s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusNeedsAttention, StatusOptions{})
 	if sc.Files[0].Status != StatusNeedsAttention || sc.Progress.AttentionHunks != 1 {
 		t.Fatalf("attention: %+v", sc)
 	}
-	sc, _ = s.SetFileStatus(ctx, code.ID, StatusReviewed)
+	sc, _ = s.SetFileStatus(ctx, code.ID, StatusReviewed, StatusOptions{})
 	if sc.Files[0].Hunks[0].Status != StatusReviewed || sc.Files[0].Hunks[1].Status != StatusReviewed {
 		t.Fatalf("file status should cascade: %+v", sc)
 	}
-	sc, _ = s.SetFilesStatus(ctx, d.Session.ID, []int64{bin.ID}, StatusReviewed)
+	sc, _ = s.SetFilesStatus(ctx, d.Session.ID, []int64{bin.ID}, StatusReviewed, StatusOptions{})
 	if sc.Progress.ReviewedFiles != 2 {
 		t.Fatalf("bulk: %+v", sc.Progress)
 	}
-	if _, err := s.SetFilesStatus(ctx, d.Session.ID+1, []int64{bin.ID}, StatusReviewed); !errors.Is(err, ErrNotFound) {
+	if _, err := s.SetFilesStatus(ctx, d.Session.ID+1, []int64{bin.ID}, StatusReviewed, StatusOptions{}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("bulk on foreign session: %v", err)
 	}
-	if _, err := s.SetFileStatus(ctx, code.ID, "bogus"); !errors.Is(err, ErrInvalid) {
+	if _, err := s.SetFileStatus(ctx, code.ID, "bogus", StatusOptions{}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("invalid status: %v", err)
 	}
 	fs, _ := s.SetPinned(ctx, code.ID, true)
@@ -172,7 +172,8 @@ func TestDetailCommentsAndUIState(t *testing.T) {
 	if len(fd.Hunks) != 2 || len(fd.Hunks[0].Lines) != 3 || len(fd.Comments) != 1 || fd.File.CommentCount != 1 {
 		t.Fatalf("unexpected file detail: %+v", fd)
 	}
-	c, err := s.UpdateComment(ctx, fd.Comments[0].ID, "edited")
+	edited := "edited"
+	c, err := s.UpdateComment(ctx, fd.Comments[0].ID, CommentPatch{Body: &edited})
 	if err != nil || c.Body != "edited" {
 		t.Fatalf("update comment: %+v %v", c, err)
 	}
@@ -212,9 +213,9 @@ func TestReplaceSnapshotCarryOver(t *testing.T) {
 	ctx := context.Background()
 	_, d := newSession(t, s, sampleDiff)
 	code, bin := d.Files[0], d.Files[1]
-	s.SetHunkStatus(ctx, code.Hunks[0].ID, StatusReviewed)
-	s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusReviewed)
-	s.SetFileStatus(ctx, bin.ID, StatusNeedsAttention)
+	s.SetHunkStatus(ctx, code.Hunks[0].ID, StatusReviewed, StatusOptions{})
+	s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusReviewed, StatusOptions{})
+	s.SetFileStatus(ctx, bin.ID, StatusNeedsAttention, StatusOptions{})
 	s.SetPinned(ctx, code.ID, true)
 
 	// Second hunk of a.go changed, a new file appeared.
@@ -292,5 +293,89 @@ func TestListNotesWithContext(t *testing.T) {
 	}
 	if notes[0].FileID != 0 || notes[1].FileID != d.Files[0].ID {
 		t.Fatalf("file ids: %+v %+v", notes[0], notes[1])
+	}
+}
+
+func TestNotesDriveStatuses(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	_, d := newSession(t, s, sampleDiff)
+	sid := d.Session.ID
+	code, bin := d.Files[0], d.Files[1]
+
+	// A line note flags its hunk and therefore its file.
+	created, err := s.CreateComment(ctx, Comment{SessionID: sid, FilePath: "a.go", Side: "new", Line: 10, Body: "rename"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Change == nil || created.Change.Files[0].Status != StatusNeedsAttention ||
+		created.Change.Files[0].Hunks[1].Status != StatusNeedsAttention || created.Change.Files[0].Hunks[0].Status != StatusUnreviewed {
+		t.Fatalf("line note should flag hunk 2 only: %+v", created.Change)
+	}
+	if !created.Comment.Export {
+		t.Fatal("notes are exported by default")
+	}
+
+	// Reviewing the hunk with a note requires confirming the deletion.
+	_, err = s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusReviewed, StatusOptions{})
+	var notesErr *NotesError
+	if !errors.As(err, &notesErr) || notesErr.Count != 1 || !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected NotesError, got %v", err)
+	}
+	sc, err := s.SetHunkStatus(ctx, code.Hunks[1].ID, StatusReviewed, StatusOptions{DeleteNotes: true})
+	if err != nil || len(sc.DeletedNoteIDs) != 1 || sc.DeletedNoteIDs[0] != created.Comment.ID {
+		t.Fatalf("deleting notes: %+v %v", sc, err)
+	}
+	if all, _ := s.ListComments(ctx, sid); len(all) != 0 {
+		t.Fatalf("note should be deleted: %+v", all)
+	}
+	// Other hunks are not affected by the note guard.
+	if _, err := s.SetHunkStatus(ctx, code.Hunks[0].ID, StatusReviewed, StatusOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// A file note flags the file; it stays flagged while the note exists.
+	created, _ = s.CreateComment(ctx, Comment{SessionID: sid, FilePath: "a.go", Body: "split this file"})
+	if created.Change.Files[0].Status != StatusNeedsAttention || created.Change.Files[0].Hunks[0].Status != StatusReviewed {
+		t.Fatalf("file note should flag the file only: %+v", created.Change.Files[0])
+	}
+	sc, _ = s.SetHunkStatus(ctx, code.Hunks[0].ID, StatusReviewed, StatusOptions{})
+	if sc.Files[0].Status != StatusNeedsAttention {
+		t.Fatalf("file with a file note must stay flagged: %+v", sc.Files[0])
+	}
+	// Deleting a note does not clear the status.
+	if err := s.DeleteComment(ctx, created.Comment.ID); err != nil {
+		t.Fatal(err)
+	}
+	fd, _ := s.GetFileDetail(ctx, code.ID)
+	if fd.File.Status != StatusNeedsAttention {
+		t.Fatalf("deleting a note must keep the status: %s", fd.File.Status)
+	}
+
+	// Reviewing a file deletes all its notes (with confirmation); bulk as well.
+	s.CreateComment(ctx, Comment{SessionID: sid, FilePath: "img.png", Body: "binary?"})
+	if _, err := s.SetFilesStatus(ctx, sid, []int64{code.ID, bin.ID}, StatusReviewed, StatusOptions{}); !errors.As(err, &notesErr) {
+		t.Fatalf("bulk review must be confirmed: %v", err)
+	}
+	sc, err = s.SetFilesStatus(ctx, sid, []int64{code.ID, bin.ID}, StatusReviewed, StatusOptions{DeleteNotes: true})
+	if err != nil || len(sc.DeletedNoteIDs) != 1 || sc.Progress.ReviewedFiles != 2 {
+		t.Fatalf("bulk review: %+v %v", sc, err)
+	}
+
+	// Session notes never change statuses.
+	created, _ = s.CreateComment(ctx, Comment{SessionID: sid, Body: "general"})
+	if created.Change != nil {
+		t.Fatalf("session note changed statuses: %+v", created.Change)
+	}
+	off := false
+	c, err := s.UpdateComment(ctx, created.Comment.ID, CommentPatch{Export: &off})
+	if err != nil || c.Export {
+		t.Fatalf("export flag: %+v %v", c, err)
+	}
+	if err := s.SetCommentsExport(ctx, sid, true); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := s.getComment(ctx, created.Comment.ID); !c.Export {
+		t.Fatal("SetCommentsExport should mark every note")
 	}
 }

@@ -2,7 +2,9 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Directive, booleanAttribute, ElementRef, afterNextRender, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
+import { Checkbox } from 'primeng/checkbox';
 import { Textarea } from 'primeng/textarea';
+import { ClearButton } from '../../core/clear-button';
 import { Comment, NoteAnchor } from '../../core/models';
 import { ReviewStore } from '../../core/review-store';
 
@@ -22,12 +24,15 @@ export class Autofocus {
 /** List of private notes attached to one anchor, with an editor. */
 @Component({
   selector: 'grb-note-thread',
-  imports: [DatePipe, FormsModule, Button, Textarea, Autofocus],
+  imports: [DatePipe, FormsModule, Button, Checkbox, Textarea, Autofocus, ClearButton],
   template: `
     @for (n of notes(); track n.id) {
-      <div class="note">
+      <div class="note" [class.not-exported]="exportable() && !n.export">
         @if (editingId() === n.id) {
-          <textarea pTextarea [autoResize]="true" rows="2" [(ngModel)]="editDraft" (keydown)="editKey($event, n)" class="w-full" grbAutofocus></textarea>
+          <div class="clearable multiline">
+            <textarea pTextarea [autoResize]="true" rows="2" [(ngModel)]="editDraft" (keydown)="editKey($event, n)" class="w-full" grbAutofocus></textarea>
+            <grb-clear-button [visible]="!!editDraft" (cleared)="editDraft = ''" />
+          </div>
           <div class="note-actions">
             <p-button label="Save" size="small" (onClick)="saveEdit(n)" [disabled]="!editDraft.trim()" />
             <p-button label="Cancel" size="small" severity="secondary" [text]="true" (onClick)="editingId.set(null)" />
@@ -35,6 +40,12 @@ export class Autofocus {
         } @else {
           <div class="note-body">{{ n.body }}</div>
           <div class="note-meta">
+            @if (exportable()) {
+              <label class="export-toggle" title="Include this note in the Markdown export">
+                <p-checkbox [binary]="true" [ngModel]="n.export" (ngModelChange)="store.setNoteExport(n, $event)" />
+                Export
+              </label>
+            }
             <span>{{ n.updatedAt | date: 'short' }}</span>
             <i class="pi pi-pencil" (click)="startEdit(n)" title="Edit"></i>
             <i class="pi pi-trash" (click)="store.deleteComment(n.id)" title="Delete"></i>
@@ -44,16 +55,19 @@ export class Autofocus {
     }
     @if (composing()) {
       <div class="composer">
-        <textarea
-          pTextarea
-          [autoResize]="true"
-          rows="2"
-          placeholder="Private note… (Ctrl+Enter to save, Esc to cancel)"
-          [(ngModel)]="draft"
-          (keydown)="composeKey($event)"
-          [grbAutofocus]="!alwaysCompose()"
-          class="w-full"
-        ></textarea>
+        <div class="clearable multiline">
+          <textarea
+            pTextarea
+            [autoResize]="true"
+            rows="2"
+            placeholder="Private note… (Ctrl+Enter to save, Esc to cancel)"
+            [(ngModel)]="draft"
+            (keydown)="composeKey($event)"
+            [grbAutofocus]="!alwaysCompose()"
+            class="w-full"
+          ></textarea>
+          <grb-clear-button [visible]="!!draft" (cleared)="draft = ''" />
+        </div>
         <div class="note-actions">
           <p-button label="Add note" size="small" (onClick)="add()" [disabled]="!draft.trim()" />
           @if (!alwaysCompose()) {
@@ -76,6 +90,8 @@ export class NoteThread {
   /** Keep the composer open (session notes dialog). */
   readonly alwaysCompose = input(false);
   readonly allowReply = input(true);
+  /** Show the "export" checkbox of each note (notes panel). */
+  readonly exportable = input(false);
 
   protected draft = '';
   protected editDraft = '';

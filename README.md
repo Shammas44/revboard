@@ -202,17 +202,32 @@ a note keeps its colours and gets a yellow left border, with a yellow comment ic
 line number. `c` adds a note on the
 whole file, and the *Notes* drawer (`N`) holds the session notes.
 
+**Notes and statuses.** A note is a request for a change, so:
+
+- adding a line note marks its hunk *needs attention*; adding a file note marks the file
+  *needs attention* (it stays so while the file note exists). Deleting a note does not change any
+  status;
+- a reviewed hunk or file holds no note: marking a hunk, a file or a folder *reviewed* while it
+  has notes asks for confirmation and then deletes those notes.
+
 The *Notes* drawer also lists **every note of the review**, grouped by file. Each line note is
 shown with its whole hunk, scrolled to the noted line, which is marked. *Go to line* opens the file,
 expands the hunk if it was collapsed, scrolls to the line and highlights it. A filter box searches
 note texts and paths. Notes whose line disappeared after a refresh are marked *outdated*.
 
+**Exporting notes for an LLM.** Every note has an *Export* checkbox in the *Notes* drawer
+(checked by default; *All* / *None* change them all). *Copy as Markdown* copies a structured
+document with the checked notes: repository root, git command and commit range, then for each
+note the file path, line (new or previous version), the noted line, the request and a diff
+excerpt with the noted line marked. Paste it into an LLM to have the requested changes
+implemented, or into a pull request.
+
 From the terminal:
 
 ```bash
+revboard review notes --markdown            # same export (checked notes; --all for every note)
 revboard review notes                       # plain text, noted lines marked with ">"
 revboard review notes --context 0           # whole hunks instead of 3 lines around the note
-revboard review notes --markdown > notes.md # paste into a pull request
 ```
 
 ### Excluding files

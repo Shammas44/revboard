@@ -130,12 +130,14 @@ type FileDetail struct {
 
 // Comment is a private note on a session, a file or a line.
 type Comment struct {
-	ID        int64     `json:"id"`
-	SessionID int64     `json:"sessionId"`
-	FilePath  string    `json:"filePath"`
-	Side      string    `json:"side"`
-	Line      int       `json:"line"`
-	Body      string    `json:"body"`
+	ID        int64  `json:"id"`
+	SessionID int64  `json:"sessionId"`
+	FilePath  string `json:"filePath"`
+	Side      string `json:"side"`
+	Line      int    `json:"line"`
+	Body      string `json:"body"`
+	// Export marks the note for the Markdown export (default true).
+	Export    bool      `json:"export"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -144,6 +146,15 @@ type Comment struct {
 type StatusChange struct {
 	Files    []FileSummary `json:"files"`
 	Progress Progress      `json:"progress"`
+	// DeletedNoteIDs lists the notes deleted because their item was marked reviewed.
+	DeletedNoteIDs []int64 `json:"deletedNoteIds"`
+}
+
+// NoteCreated is returned when a note is added: the note and, when its hunk or
+// file was flagged "needs attention", the resulting status change.
+type NoteCreated struct {
+	Comment Comment       `json:"comment"`
+	Change  *StatusChange `json:"change"`
 }
 
 // NewSession holds the metadata of a session to create.

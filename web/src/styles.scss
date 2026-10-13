@@ -517,3 +517,73 @@ table.diff {
     font-style: italic;
   }
 }
+
+/* ---- Clear ("×") buttons inside text inputs ---- */
+.clearable {
+  position: relative;
+  display: block;
+
+  input {
+    padding-right: 2rem;
+  }
+
+  textarea {
+    padding-right: 2rem;
+  }
+
+  .clear-button {
+    position: absolute;
+    right: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--p-text-muted-color);
+    cursor: pointer;
+
+    .pi {
+      font-size: 0.7rem;
+    }
+
+    &:hover {
+      background: var(--p-content-hover-background);
+      color: var(--p-text-color);
+    }
+  }
+
+  /* Textareas: top-right corner instead of vertically centred. */
+  &.multiline .clear-button {
+    top: 0.4rem;
+    transform: none;
+  }
+}
+
+/* ---- Note export marks ---- */
+.export-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+
+  .p-checkbox {
+    transform: scale(0.85);
+  }
+}
+
+.note.not-exported {
+  opacity: 0.55;
+  border-left-color: var(--p-content-border-color);
+}
+
+.session-name .clearable {
+  display: inline-block;
+}

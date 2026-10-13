@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"revboard/internal/export"
 	"revboard/internal/gitx"
 	"revboard/internal/review"
 	"revboard/internal/store"
@@ -440,19 +441,24 @@ list the commits touching one file.`,
 
 func newReviewNotesCmd(a *app) *cobra.Command {
 	var (
-		markdown bool
-		context  int
+		markdown, all bool
+		context       int
 	)
 	cmd := &cobra.Command{
 		Use:   "notes [session-id]",
 		Short: "Print the notes of a session with the code they refer to",
 		Long: `Print every note of a session: session notes, file notes and line notes.
 Each line note is shown with the lines of its hunk around the noted line (see
---context), the noted line marked with ">". Use --markdown to get a document
-you can paste in a pull request.`,
+--context), the noted line marked with ">".
+
+--markdown prints the notes marked for export (all by default; use --all to
+ignore the marks) as a structured document meant for a developer or an LLM to
+implement the requested changes: repository, git command, and for each note
+the file path, line, request and code context.`,
 		Example: `  revboard review notes
   revboard review notes --context 0          # whole hunks
-  revboard review notes 12 --markdown > review-notes.md`,
+  revboard review notes 12 --markdown > review-notes.md
+  revboard review notes --markdown | xclip -selection clipboard`,
 		Args: maxArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			st, err := a.open()
@@ -470,22 +476,30 @@ you can paste in a pull request.`,
 			if context < 0 {
 				return usageError{fmt.Errorf("--context must be >= 0")}
 			}
-			printNotes(cmd.OutOrStdout(), se, notes, markdown, context)
+			if markdown {
+				opt := export.Options{All: all, Context: context}
+				if !cmd.Flags().Changed("context") {
+					opt.Context = export.DefaultContext
+				}
+				if revs, desc, err := gitx.CommitRange(cmd.Context(), se.WorkDir, se.GitArgs); err == nil && len(revs) > 0 {
+					opt.Range = desc
+				}
+				fmt.Fprint(cmd.OutOrStdout(), export.Markdown(se, notes, opt))
+				return nil
+			}
+			printNotes(cmd.OutOrStdout(), se, notes, context)
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&markdown, "markdown", false, "print Markdown instead of plain text")
+	cmd.Flags().BoolVar(&markdown, "markdown", false, "print the Markdown export (for a developer or an LLM)")
+	cmd.Flags().BoolVar(&all, "all", false, "with --markdown: include the notes not marked for export")
 	cmd.Flags().IntVarP(&context, "context", "C", 3, "lines shown around a noted line (0 = whole hunk)")
 	return cmd
 }
 
-// printNotes renders notes as plain text or Markdown.
-func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, markdown bool, context int) {
-	if markdown {
-		fmt.Fprintf(out, "# Review notes — %s\n\n`%s`\n", se.Name, quoteArgs(se.GitArgs))
-	} else {
-		fmt.Fprintf(out, "Notes of review session #%d %q: %d\n", se.ID, se.Name, len(notes))
-	}
+// printNotes renders notes as plain text.
+func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, context int) {
+	fmt.Fprintf(out, "Notes of review session #%d %q: %d\n", se.ID, se.Name, len(notes))
 	if len(notes) == 0 {
 		fmt.Fprintln(out, "\nNo notes.")
 		return
@@ -498,39 +512,23 @@ func printNotes(out io.Writer, se store.Session, notes []store.NoteContext, mark
 			if title == "" {
 				title = "Session"
 			}
-			if markdown {
-				fmt.Fprintf(out, "\n## %s\n", title)
-			} else {
-				fmt.Fprintf(out, "\n== %s\n", title)
-			}
+			fmt.Fprintf(out, "\n== %s\n", title)
 		}
 		where := "file"
-		if n.Line > 0 {
+		switch {
+		case n.FilePath == "":
+			where = "session"
+		case n.Line > 0:
 			where = fmt.Sprintf("line %d (%s)", n.Line, n.Side)
 			if n.Outdated {
 				where += ", no longer in the diff"
 			}
 		}
-		if n.FilePath == "" {
-			where = "session"
-		}
-		excerpt := excerptWindow(n.Excerpt, context)
-		if markdown {
-			fmt.Fprintf(out, "\n**%s**\n\n", where)
-			if len(excerpt) > 0 {
-				fmt.Fprintf(out, "```diff\n%s\n", n.HunkHeader)
-				for _, l := range excerpt {
-					fmt.Fprintln(out, excerptLine(l))
-				}
-				fmt.Fprintln(out, "```")
-			}
-			for _, line := range strings.Split(n.Body, "\n") {
-				fmt.Fprintf(out, "> %s\n", line)
-			}
-			continue
+		if !n.Export {
+			where += ", not exported"
 		}
 		fmt.Fprintf(out, "\n  [%s]\n", where)
-		if len(excerpt) > 0 {
+		if excerpt := excerptWindow(n.Excerpt, context); len(excerpt) > 0 {
 			fmt.Fprintf(out, "    %s\n", n.HunkHeader)
 			for _, l := range excerpt {
 				marker := " "

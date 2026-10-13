@@ -5,6 +5,7 @@ import {
   Comment,
   CommitList,
   NoteContext,
+  NoteCreated,
   FileDetail,
   FileSummary,
   NoteAnchor,
@@ -64,24 +65,34 @@ export class ApiService {
     return this.http.get<CommitList>(`/api/sessions/${sessionId}/commits`, { params: path ? { path } : {} });
   }
 
-  setFilesStatus(sessionId: number, fileIds: number[], status: ReviewStatus): Observable<StatusChange> {
-    return this.http.post<StatusChange>(`/api/sessions/${sessionId}/status`, { fileIds, status });
+  setFilesStatus(sessionId: number, fileIds: number[], status: ReviewStatus, deleteNotes = false): Observable<StatusChange> {
+    return this.http.post<StatusChange>(`/api/sessions/${sessionId}/status`, { fileIds, status, deleteNotes });
+  }
+
+  /** Markdown export of the notes marked for export (all: every note). */
+  exportNotes(sessionId: number, all = false): Observable<string> {
+    return this.http.get(`/api/sessions/${sessionId}/notes/export`, { params: all ? { all: '1' } : {}, responseType: 'text' });
+  }
+
+  /** Marks or unmarks every note of a session for export. */
+  setAllNotesExport(sessionId: number, exported: boolean): Observable<void> {
+    return this.http.put<void>(`/api/sessions/${sessionId}/notes/export`, { export: exported });
   }
 
   getFile(id: number): Observable<FileDetail> {
     return this.http.get<FileDetail>(`/api/files/${id}`);
   }
 
-  setFileStatus(id: number, status: ReviewStatus): Observable<StatusChange> {
-    return this.http.put<StatusChange>(`/api/files/${id}/status`, { status });
+  setFileStatus(id: number, status: ReviewStatus, deleteNotes = false): Observable<StatusChange> {
+    return this.http.put<StatusChange>(`/api/files/${id}/status`, { status, deleteNotes });
   }
 
   setPinned(id: number, pinned: boolean): Observable<FileSummary> {
     return this.http.put<FileSummary>(`/api/files/${id}/pin`, { pinned });
   }
 
-  setHunkStatus(id: number, status: ReviewStatus): Observable<StatusChange> {
-    return this.http.put<StatusChange>(`/api/hunks/${id}/status`, { status });
+  setHunkStatus(id: number, status: ReviewStatus, deleteNotes = false): Observable<StatusChange> {
+    return this.http.put<StatusChange>(`/api/hunks/${id}/status`, { status, deleteNotes });
   }
 
   listComments(sessionId: number): Observable<Comment[]> {
@@ -92,12 +103,12 @@ export class ApiService {
     return this.http.get<NoteContext[]>(`/api/sessions/${sessionId}/notes`);
   }
 
-  createComment(sessionId: number, anchor: NoteAnchor, body: string): Observable<Comment> {
-    return this.http.post<Comment>(`/api/sessions/${sessionId}/comments`, { ...anchor, body });
+  createComment(sessionId: number, anchor: NoteAnchor, body: string): Observable<NoteCreated> {
+    return this.http.post<NoteCreated>(`/api/sessions/${sessionId}/comments`, { ...anchor, body });
   }
 
-  updateComment(id: number, body: string): Observable<Comment> {
-    return this.http.patch<Comment>(`/api/comments/${id}`, { body });
+  updateComment(id: number, patch: { body?: string; export?: boolean }): Observable<Comment> {
+    return this.http.patch<Comment>(`/api/comments/${id}`, patch);
   }
 
   deleteComment(id: number): Observable<void> {

@@ -13,6 +13,7 @@ import { ToggleSwitch } from 'primeng/toggleswitch';
 import { Tooltip } from 'primeng/tooltip';
 import { forkJoin, map, of, switchMap } from 'rxjs';
 import { ApiService, errorMessage } from '../../core/api.service';
+import { ClearButton } from '../../core/clear-button';
 import { Project, Session } from '../../core/models';
 
 interface ProjectGroup {
@@ -23,7 +24,7 @@ interface ProjectGroup {
 /** Lists every project with its review sessions. */
 @Component({
   selector: 'grb-dashboard',
-  imports: [RouterLink, FormsModule, DatePipe, Button, Dialog, InputText, ProgressBar, TableModule, Tag, ToggleSwitch, Tooltip],
+  imports: [RouterLink, FormsModule, DatePipe, Button, ClearButton, Dialog, InputText, ProgressBar, TableModule, Tag, ToggleSwitch, Tooltip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

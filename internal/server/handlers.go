@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"revboard/internal/diff"
+	"revboard/internal/export"
 	"revboard/internal/gitx"
 	"revboard/internal/review"
 	"revboard/internal/store"
@@ -28,6 +29,8 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/sessions/{id}/commits", s.listCommits)
 	mux.HandleFunc("GET /api/sessions/{id}/comments", s.listComments)
 	mux.HandleFunc("GET /api/sessions/{id}/notes", s.listNotes)
+	mux.HandleFunc("GET /api/sessions/{id}/notes/export", s.exportNotes)
+	mux.HandleFunc("PUT /api/sessions/{id}/notes/export", s.setNotesExport)
 	mux.HandleFunc("POST /api/sessions/{id}/comments", s.createComment)
 	mux.HandleFunc("GET /api/files/{id}", s.getFile)
 	mux.HandleFunc("PUT /api/files/{id}/status", s.setFileStatus)
@@ -52,7 +55,10 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 // fail maps domain errors to HTTP status codes.
 func fail(w http.ResponseWriter, err error) {
 	var gitErr *gitx.Error
+	var notesErr *store.NotesError
 	switch {
+	case errors.As(err, &notesErr):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error(), "noteCount": notesErr.Count})
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, store.ErrInvalid):
@@ -193,13 +199,14 @@ func (s *Server) bulkStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		FileIDs []int64      `json:"fileIds"`
-		Status  store.Status `json:"status"`
+		FileIDs     []int64      `json:"fileIds"`
+		Status      store.Status `json:"status"`
+		DeleteNotes bool         `json:"deleteNotes"`
 	}
 	if !decode(w, r, &body) {
 		return
 	}
-	sc, err := s.store.SetFilesStatus(r.Context(), id, body.FileIDs, body.Status)
+	sc, err := s.store.SetFilesStatus(r.Context(), id, body.FileIDs, body.Status, store.StatusOptions{DeleteNotes: body.DeleteNotes})
 	if err != nil {
 		fail(w, err)
 		return
@@ -246,6 +253,50 @@ func (s *Server) listNotes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, notes)
 }
 
+// exportNotes returns the notes marked for export as Markdown (all=1: every note).
+func (s *Server) exportNotes(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	se, err := s.store.GetSession(r.Context(), id)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	notes, err := s.store.ListNotesWithContext(r.Context(), id)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	opt := export.Options{All: r.URL.Query().Get("all") == "1", Context: export.DefaultContext}
+	if revs, desc, err := gitx.CommitRange(r.Context(), se.WorkDir, se.GitArgs); err == nil && len(revs) > 0 {
+		opt.Range = desc
+	}
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("X-Revboard-Notes", strconv.Itoa(len(export.Selected(notes, opt))))
+	_, _ = w.Write([]byte(export.Markdown(se, notes, opt)))
+}
+
+// setNotesExport marks or unmarks every note of a session for export.
+func (s *Server) setNotesExport(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Export bool `json:"export"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if err := s.store.SetCommentsExport(r.Context(), id, body.Export); err != nil {
+		fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -260,14 +311,14 @@ func (s *Server) createComment(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	c, err := s.store.CreateComment(r.Context(), store.Comment{
+	created, err := s.store.CreateComment(r.Context(), store.Comment{
 		SessionID: id, FilePath: body.FilePath, Side: body.Side, Line: body.Line, Body: body.Body,
 	})
 	if err != nil {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, c)
+	writeJSON(w, http.StatusCreated, created)
 }
 
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +335,8 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {
 }
 
 type statusBody struct {
-	Status store.Status `json:"status"`
+	Status      store.Status `json:"status"`
+	DeleteNotes bool         `json:"deleteNotes"`
 }
 
 func (s *Server) setFileStatus(w http.ResponseWriter, r *http.Request) {
@@ -296,7 +348,7 @@ func (s *Server) setFileStatus(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	sc, err := s.store.SetFileStatus(r.Context(), id, body.Status)
+	sc, err := s.store.SetFileStatus(r.Context(), id, body.Status, store.StatusOptions{DeleteNotes: body.DeleteNotes})
 	if err != nil {
 		fail(w, err)
 		return
@@ -313,7 +365,7 @@ func (s *Server) setHunkStatus(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &body) {
 		return
 	}
-	sc, err := s.store.SetHunkStatus(r.Context(), id, body.Status)
+	sc, err := s.store.SetHunkStatus(r.Context(), id, body.Status, store.StatusOptions{DeleteNotes: body.DeleteNotes})
 	if err != nil {
 		fail(w, err)
 		return
@@ -346,12 +398,13 @@ func (s *Server) patchComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Body string `json:"body"`
+		Body   *string `json:"body"`
+		Export *bool   `json:"export"`
 	}
 	if !decode(w, r, &body) {
 		return
 	}
-	c, err := s.store.UpdateComment(r.Context(), id, body.Body)
+	c, err := s.store.UpdateComment(r.Context(), id, store.CommentPatch{Body: body.Body, Export: body.Export})
 	if err != nil {
 		fail(w, err)
 		return

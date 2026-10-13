@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"revboard/internal/diff"
@@ -17,6 +16,8 @@ type carryOver struct {
 	// hunks maps path + "\x00" + content hash to the statuses of matching hunks;
 	// entries are consumed as they are reused.
 	hunks map[string][]Status
+	// fileNotes lists the paths carrying file notes (their files need attention).
+	fileNotes map[string]bool
 }
 
 type previousFile struct {
@@ -95,6 +96,9 @@ func insertSnapshot(ctx context.Context, tx *sql.Tx, sessionID int64, d *diff.Di
 		if len(f.Hunks) > 0 {
 			status = aggregateStatus(statuses)
 		}
+		if carry != nil && carry.fileNotes[path] {
+			status = StatusNeedsAttention
+		}
 		res, err := fileStmt.ExecContext(ctx, sessionID, i, path, f.OldPath, f.NewPath, string(f.ChangeType),
 			boolToInt(f.IsBinary), f.OldMode, f.NewMode, f.Similarity, f.Additions, f.Deletions, status, boolToInt(pinned))
 		if err != nil {
@@ -120,7 +124,21 @@ func insertSnapshot(ctx context.Context, tx *sql.Tx, sessionID int64, d *diff.Di
 // path and are not affected.
 func (s *Store) ReplaceSnapshot(ctx context.Context, sessionID int64, headSHA string, d *diff.Diff) error {
 	return s.tx(ctx, func(tx *sql.Tx) error {
-		carry := &carryOver{files: map[string]previousFile{}, hunks: map[string][]Status{}}
+		carry := &carryOver{files: map[string]previousFile{}, hunks: map[string][]Status{}, fileNotes: map[string]bool{}}
+		notePaths, err := tx.QueryContext(ctx, `SELECT DISTINCT file_path FROM comments
+			WHERE session_id = ? AND line = 0 AND file_path <> ''`, sessionID)
+		if err != nil {
+			return err
+		}
+		for notePaths.Next() {
+			var path string
+			if err := notePaths.Scan(&path); err != nil {
+				notePaths.Close()
+				return err
+			}
+			carry.fileNotes[path] = true
+		}
+		notePaths.Close()
 		rows, err := tx.QueryContext(ctx, `SELECT path, status, pinned, change_type FROM review_files WHERE session_id = ?`, sessionID)
 		if err != nil {
 			return err
@@ -265,146 +283,6 @@ func (s *Store) GetFileDetail(ctx context.Context, fileID int64) (FileDetail, er
 	}
 	detail.Comments, err = listComments(ctx, s.db, f.SessionID, &f.Path)
 	return detail, err
-}
-
-// setFileStatus sets the status of a file and cascades it to its hunks.
-func setFileStatus(ctx context.Context, tx *sql.Tx, fileID int64, st Status) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE review_hunks SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		WHERE file_id = ? AND status <> ?`, st, fileID, st); err != nil {
-		return err
-	}
-	res, err := tx.ExecContext(ctx, `UPDATE review_files SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		WHERE id = ?`, st, fileID)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return notFound("file", fileID)
-	}
-	return nil
-}
-
-func (s *Store) statusChange(ctx context.Context, tx *sql.Tx, sessionID int64, fileIDs []int64) (StatusChange, error) {
-	sc := StatusChange{Files: make([]FileSummary, 0, len(fileIDs))}
-	for _, id := range fileIDs {
-		f, err := fileSummary(ctx, tx, id)
-		if err != nil {
-			return sc, err
-		}
-		sc.Files = append(sc.Files, f)
-	}
-	var err error
-	sc.Progress, err = progress(ctx, tx, sessionID)
-	return sc, err
-}
-
-func touchSessionTx(ctx context.Context, tx *sql.Tx, sessionID int64) error {
-	_, err := tx.ExecContext(ctx, `UPDATE review_sessions SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, sessionID)
-	return err
-}
-
-// SetFileStatus sets the status of a file and of all of its hunks.
-func (s *Store) SetFileStatus(ctx context.Context, fileID int64, st Status) (StatusChange, error) {
-	if !st.Valid() {
-		return StatusChange{}, fmt.Errorf("unknown status %q: %w", st, ErrInvalid)
-	}
-	var sc StatusChange
-	err := s.tx(ctx, func(tx *sql.Tx) error {
-		var sessionID int64
-		err := tx.QueryRowContext(ctx, `SELECT session_id FROM review_files WHERE id = ?`, fileID).Scan(&sessionID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return notFound("file", fileID)
-		}
-		if err != nil {
-			return err
-		}
-		if err := setFileStatus(ctx, tx, fileID, st); err != nil {
-			return err
-		}
-		if err := touchSessionTx(ctx, tx, sessionID); err != nil {
-			return err
-		}
-		sc, err = s.statusChange(ctx, tx, sessionID, []int64{fileID})
-		return err
-	})
-	return sc, err
-}
-
-// SetFilesStatus sets the status of several files of a session (e.g. a folder).
-func (s *Store) SetFilesStatus(ctx context.Context, sessionID int64, fileIDs []int64, st Status) (StatusChange, error) {
-	if !st.Valid() {
-		return StatusChange{}, fmt.Errorf("unknown status %q: %w", st, ErrInvalid)
-	}
-	var sc StatusChange
-	err := s.tx(ctx, func(tx *sql.Tx) error {
-		for _, id := range fileIDs {
-			var sid int64
-			err := tx.QueryRowContext(ctx, `SELECT session_id FROM review_files WHERE id = ?`, id).Scan(&sid)
-			if errors.Is(err, sql.ErrNoRows) || (err == nil && sid != sessionID) {
-				return notFound("file", id)
-			}
-			if err != nil {
-				return err
-			}
-			if err := setFileStatus(ctx, tx, id, st); err != nil {
-				return err
-			}
-		}
-		if err := touchSessionTx(ctx, tx, sessionID); err != nil {
-			return err
-		}
-		var err error
-		sc, err = s.statusChange(ctx, tx, sessionID, fileIDs)
-		return err
-	})
-	return sc, err
-}
-
-// SetHunkStatus sets the status of a hunk and recomputes the status of its file.
-func (s *Store) SetHunkStatus(ctx context.Context, hunkID int64, st Status) (StatusChange, error) {
-	if !st.Valid() {
-		return StatusChange{}, fmt.Errorf("unknown status %q: %w", st, ErrInvalid)
-	}
-	var sc StatusChange
-	err := s.tx(ctx, func(tx *sql.Tx) error {
-		var fileID, sessionID int64
-		err := tx.QueryRowContext(ctx, `SELECT h.file_id, f.session_id FROM review_hunks h
-			JOIN review_files f ON f.id = h.file_id WHERE h.id = ?`, hunkID).Scan(&fileID, &sessionID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return notFound("hunk", hunkID)
-		}
-		if err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE review_hunks SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE id = ?`, st, hunkID); err != nil {
-			return err
-		}
-		rows, err := tx.QueryContext(ctx, `SELECT status FROM review_hunks WHERE file_id = ?`, fileID)
-		if err != nil {
-			return err
-		}
-		var statuses []Status
-		for rows.Next() {
-			var s Status
-			if err := rows.Scan(&s); err != nil {
-				rows.Close()
-				return err
-			}
-			statuses = append(statuses, s)
-		}
-		rows.Close()
-		if _, err := tx.ExecContext(ctx, `UPDATE review_files SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE id = ?`, aggregateStatus(statuses), fileID); err != nil {
-			return err
-		}
-		if err := touchSessionTx(ctx, tx, sessionID); err != nil {
-			return err
-		}
-		sc, err = s.statusChange(ctx, tx, sessionID, []int64{fileID})
-		return err
-	})
-	return sc, err
 }
 
 // SetPinned pins or unpins a file.

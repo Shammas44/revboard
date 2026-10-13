@@ -21,6 +21,8 @@ type NoteContext struct {
 	// or when the path is no longer part of the diff).
 	FileID     int64  `json:"fileId"`
 	FileStatus Status `json:"fileStatus,omitempty"`
+	ChangeType string `json:"changeType,omitempty"`
+	OldPath    string `json:"oldPath,omitempty"`
 	Excluded   bool   `json:"excluded"`
 	// HunkID, HunkHeader and HunkSection identify the hunk containing a line note;
 	// Excerpt holds all of its lines.
@@ -68,7 +70,7 @@ func (s *Store) ListNotesWithContext(ctx context.Context, sessionID int64) ([]No
 		if _, done := hunks[f.ID]; done {
 			continue
 		}
-		if hunks[f.ID], err = loadNoteHunks(ctx, s, f.ID); err != nil {
+		if hunks[f.ID], err = loadNoteHunks(ctx, s.db, f.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -78,6 +80,7 @@ func (s *Store) ListNotesWithContext(ctx context.Context, sessionID int64) ([]No
 		n := NoteContext{Comment: c, Excerpt: []ExcerptLine{}}
 		if f, ok := byPath[c.FilePath]; ok {
 			n.FileID, n.FileStatus, n.Excluded = f.ID, f.Status, f.Excluded
+			n.ChangeType, n.OldPath = f.ChangeType, f.OldPath
 		}
 		if c.Line > 0 {
 			n.Outdated = true
@@ -120,8 +123,8 @@ func (s *Store) ListNotesWithContext(ctx context.Context, sessionID int64) ([]No
 	return notes, nil
 }
 
-func loadNoteHunks(ctx context.Context, s *Store, fileID int64) ([]noteHunk, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, old_start, old_lines, new_start, new_lines, section, body
+func loadNoteHunks(ctx context.Context, q dbtx, fileID int64) ([]noteHunk, error) {
+	rows, err := q.QueryContext(ctx, `SELECT id, old_start, old_lines, new_start, new_lines, section, body
 		FROM review_hunks WHERE file_id = ? ORDER BY position`, fileID)
 	if err != nil {
 		return nil, err

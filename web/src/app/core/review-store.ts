@@ -1,6 +1,7 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { MessageService } from 'primeng/api';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { EMPTY, Observable, Subject, catchError, concatMap, debounceTime, finalize, of, switchMap, tap } from 'rxjs';
 import { ApiService, errorMessage } from './api.service';
 import { buildTree, filesUnder, flattenTree } from './file-tree';
@@ -28,6 +29,29 @@ import { aggregateStatus } from './status';
 interface Write {
   call: () => Observable<StatusChange | FileSummary>;
   rollback: () => void;
+  /** Called (after the rollback) when the server refuses to mark reviewed an item holding notes. */
+  onNotes?: (count: number) => void;
+}
+
+/** Returns the note count of a "notes attached" refusal (HTTP 409), or 0. */
+function notesConflict(err: unknown): number {
+  return err instanceof HttpErrorResponse && err.status === 409 ? Number(err.error?.noteCount ?? 0) : 0;
+}
+
+/** Copies text to the clipboard (with a fallback for non-secure contexts). */
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  const ok = document.execCommand('copy');
+  area.remove();
+  if (!ok) throw new Error('The browser refused to copy to the clipboard');
 }
 
 const DETAIL_CACHE_SIZE = 20;
@@ -58,6 +82,7 @@ function toFileVM(f: FileSummary): FileVM {
 export class ReviewStore {
   private readonly api = inject(ApiService);
   private readonly toast = inject(MessageService);
+  private readonly confirmation = inject(ConfirmationService);
   private readonly destroyRef = inject(DestroyRef);
 
   /* ---- Loaded data ---- */
@@ -225,13 +250,19 @@ export class ReviewStore {
         concatMap((w) =>
           w.call().pipe(
             tap((res) => {
-              if (this.pendingWrites === 1 && 'progress' in res) {
-                this.reconcile(res);
+              if ('progress' in res) {
+                this.dropNotes(res.deletedNoteIds);
+                if (this.pendingWrites === 1) this.reconcile(res);
               }
             }),
             catchError((err) => {
               w.rollback();
-              this.error('Could not save', err);
+              const count = notesConflict(err);
+              if (count > 0 && w.onNotes) {
+                w.onNotes(count);
+              } else {
+                this.error('Could not save', err);
+              }
               return EMPTY;
             }),
             finalize(() => this.pendingWrites--),
@@ -546,7 +577,21 @@ export class ReviewStore {
 
   /* ---- Status mutations (optimistic) ---- */
 
-  setHunkStatus(hunkId: number, status: ReviewStatus): void {
+  /**
+   * Sets the status of a hunk. A reviewed hunk cannot hold notes: marking a
+   * hunk with notes reviewed asks to delete them first. `then` runs once the
+   * change is applied (not when it is cancelled).
+   */
+  setHunkStatus(hunkId: number, status: ReviewStatus, then?: () => void): void {
+    const count = status === 'reviewed' ? this.notesInHunk(hunkId) : 0;
+    if (count > 0) {
+      this.confirmDeleteNotes(count, 'hunk', () => this.applyHunkStatus(hunkId, status, true, then));
+    } else {
+      this.applyHunkStatus(hunkId, status, false, then);
+    }
+  }
+
+  private applyHunkStatus(hunkId: number, status: ReviewStatus, deleteNotes: boolean, then?: () => void): void {
     const entry = this.hunkIndex().get(hunkId);
     if (!entry) {
       return;
@@ -556,33 +601,88 @@ export class ReviewStore {
     const prevHunk = hunk.status();
     const prevFile = file.status();
     hunk.status.set(status);
-    file.status.set(aggregateStatus(file.hunks.map((h) => h.status())));
+    const fileNotes = (this.commentsByPath().get(file.summary.path) ?? []).some((c) => c.line === 0 && !deleteNotes);
+    file.status.set(fileNotes ? 'needs_attention' : aggregateStatus(file.hunks.map((h) => h.status())));
     this.enqueue({
-      call: () => this.api.setHunkStatus(hunkId, status),
+      call: () => this.api.setHunkStatus(hunkId, status, deleteNotes),
       rollback: () => {
         hunk.status.set(prevHunk);
         file.status.set(prevFile);
       },
+      onNotes: (count) => this.confirmDeleteNotes(count, 'hunk', () => this.applyHunkStatus(hunkId, status, true)),
     });
+    then?.();
   }
 
-  setFileStatus(fileId: number, status: ReviewStatus): void {
+  /** Sets the status of a file and its hunks (marking it reviewed deletes its notes, after confirmation). */
+  setFileStatus(fileId: number, status: ReviewStatus, then?: () => void): void {
     const file = this.fileById().get(fileId);
-    if (!file) {
-      return;
+    if (file) {
+      this.setFilesStatus([file], status, then);
     }
-    const rollback = this.applyFileStatus([file], status);
-    this.enqueue({ call: () => this.api.setFileStatus(fileId, status), rollback });
   }
 
   /** Sets the status of several files at once (e.g. a directory). */
-  setFilesStatus(files: readonly FileVM[], status: ReviewStatus): void {
+  setFilesStatus(files: readonly FileVM[], status: ReviewStatus, then?: () => void): void {
+    if (files.length === 0) {
+      return;
+    }
+    const byPath = this.commentsByPath();
+    const count = status === 'reviewed' ? files.reduce((n, f) => n + (byPath.get(f.summary.path)?.length ?? 0), 0) : 0;
+    const what = files.length === 1 ? 'file' : `selection of ${files.length} files`;
+    if (count > 0) {
+      this.confirmDeleteNotes(count, what, () => this.applyFilesStatus(files, status, true, then));
+    } else {
+      this.applyFilesStatus(files, status, false, then);
+    }
+  }
+
+  private applyFilesStatus(files: readonly FileVM[], status: ReviewStatus, deleteNotes: boolean, then?: () => void): void {
     const id = this.session()?.id;
-    if (id == null || files.length === 0) {
+    if (id == null) {
       return;
     }
     const rollback = this.applyFileStatus(files, status);
-    this.enqueue({ call: () => this.api.setFilesStatus(id, files.map((f) => f.id), status), rollback });
+    const ids = files.map((f) => f.id);
+    this.enqueue({
+      call: () => (ids.length === 1 ? this.api.setFileStatus(ids[0], status, deleteNotes) : this.api.setFilesStatus(id, ids, status, deleteNotes)),
+      rollback,
+      onNotes: (count) => this.confirmDeleteNotes(count, files.length === 1 ? 'file' : 'selection', () => this.applyFilesStatus(files, status, true)),
+    });
+    then?.();
+  }
+
+  /** Number of line notes anchored in a hunk, from the loaded diff (0 when unknown: the server checks). */
+  private notesInHunk(hunkId: number): number {
+    const entry = this.hunkIndex().get(hunkId);
+    const detail = entry && this.detailCache.get(entry.file.id);
+    const hunk = detail?.hunks.find((h) => h.id === hunkId);
+    if (!entry || !hunk) {
+      return 0;
+    }
+    const notes = (this.commentsByPath().get(entry.file.summary.path) ?? []).filter((c) => c.line > 0);
+    return notes.filter((c) =>
+      hunk.lines.some((l) => (c.side === 'new' ? l.kind !== 'delete' && l.newLine === c.line : l.kind !== 'add' && l.oldLine === c.line)),
+    ).length;
+  }
+
+  private confirmDeleteNotes(count: number, what: string, accept: () => void): void {
+    this.confirmation.confirm({
+      header: 'Delete notes?',
+      message: `This ${what} has ${count} note${count > 1 ? 's' : ''}. A reviewed ${what === 'hunk' || what === 'file' ? what : 'file'} cannot hold notes: marking it reviewed deletes ${count > 1 ? 'them' : 'it'}.`,
+      icon: 'pi pi-exclamation-triangle',
+      acceptButtonProps: { label: 'Mark reviewed and delete', severity: 'danger' },
+      rejectButtonProps: { label: 'Cancel', severity: 'secondary', text: true },
+      accept,
+    });
+  }
+
+  /** Removes notes deleted by the server. */
+  private dropNotes(ids: readonly number[] | undefined): void {
+    if (ids && ids.length > 0) {
+      const gone = new Set(ids);
+      this.comments.update((list) => list.filter((c) => !gone.has(c.id)));
+    }
   }
 
   private applyFileStatus(files: readonly FileVM[], status: ReviewStatus): () => void {
@@ -630,12 +730,14 @@ export class ReviewStore {
 
   /* ---- Notes ---- */
 
+  /** Adds a note; the server flags its hunk (line note) or file (file note) "needs attention". */
   addComment(anchor: NoteAnchor, body: string, done?: () => void): void {
     const id = this.session()?.id;
     if (id == null) return;
     this.api.createComment(id, anchor, body).subscribe({
-      next: (c) => {
-        this.comments.update((list) => [...list, c]);
+      next: ({ comment, change }) => {
+        this.comments.update((list) => [...list, comment]);
+        if (change) this.reconcile(change);
         done?.();
       },
       error: (err) => this.error('Could not save the note', err),
@@ -643,7 +745,7 @@ export class ReviewStore {
   }
 
   updateComment(id: number, body: string, done?: () => void): void {
-    this.api.updateComment(id, body).subscribe({
+    this.api.updateComment(id, { body }).subscribe({
       next: (c) => {
         this.comments.update((list) => list.map((x) => (x.id === c.id ? c : x)));
         done?.();
@@ -656,6 +758,43 @@ export class ReviewStore {
     this.api.deleteComment(id).subscribe({
       next: () => this.comments.update((list) => list.filter((x) => x.id !== id)),
       error: (err) => this.error('Could not delete the note', err),
+    });
+  }
+
+  /** Marks or unmarks a note for the Markdown export (optimistic). */
+  setNoteExport(note: Comment, exported: boolean): void {
+    const apply = (value: boolean) => this.comments.update((list) => list.map((c) => (c.id === note.id ? { ...c, export: value } : c)));
+    apply(exported);
+    this.api.updateComment(note.id, { export: exported }).subscribe({
+      error: (err) => {
+        apply(!exported);
+        this.error('Could not save the note', err);
+      },
+    });
+  }
+
+  /** Marks or unmarks every note of the session for export. */
+  setAllNotesExport(exported: boolean): void {
+    const id = this.session()?.id;
+    if (id == null) return;
+    this.api.setAllNotesExport(id, exported).subscribe({
+      next: () => this.comments.update((list) => list.map((c) => ({ ...c, export: exported }))),
+      error: (err) => this.error('Could not save the notes', err),
+    });
+  }
+
+  /** Copies the Markdown export of the notes marked for export to the clipboard. */
+  copyNotesExport(): void {
+    const id = this.session()?.id;
+    if (id == null) return;
+    const count = this.comments().filter((c) => c.export).length;
+    this.api.exportNotes(id).subscribe({
+      next: (markdown) =>
+        copyText(markdown).then(
+          () => this.toast.add({ severity: 'success', summary: 'Copied', detail: `${count} note${count === 1 ? '' : 's'} copied as Markdown.`, life: 3000 }),
+          (err) => this.error('Could not copy to the clipboard', err),
+        ),
+      error: (err) => this.error('Could not export the notes', err),
     });
   }
 

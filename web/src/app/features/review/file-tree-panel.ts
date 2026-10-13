@@ -6,6 +6,7 @@ import { InputIcon } from 'primeng/inputicon';
 import { InputText } from 'primeng/inputtext';
 import { Select } from 'primeng/select';
 import { Tooltip } from 'primeng/tooltip';
+import { ClearButton } from '../../core/clear-button';
 import { fileName, TreeRow } from '../../core/file-tree';
 import { FileFilter, FileVM, ReviewStatus } from '../../core/models';
 import { ReviewStore } from '../../core/review-store';
@@ -17,7 +18,7 @@ const ROW_HEIGHT = 28;
 /** Search, filter, pinned files and the (virtualised) file tree. */
 @Component({
   selector: 'grb-file-tree-panel',
-  imports: [ScrollingModule, FormsModule, IconField, InputIcon, InputText, Select, Tooltip],
+  imports: [ScrollingModule, FormsModule, IconField, InputIcon, InputText, Select, Tooltip, ClearButton],
   templateUrl: './file-tree-panel.html',
   styleUrl: './file-tree-panel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

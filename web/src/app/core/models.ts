@@ -106,6 +106,8 @@ export interface Comment {
   side: Side;
   line: number;
   body: string;
+  /** Included in the Markdown export (default true). */
+  export: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,6 +121,14 @@ export interface FileDetail {
 export interface StatusChange {
   files: FileSummary[];
   progress: Progress;
+  /** Notes deleted because their hunk/file was marked reviewed. */
+  deletedNoteIds: number[];
+}
+
+/** Response of note creation: the hunk or file of the note is flagged "needs attention". */
+export interface NoteCreated {
+  comment: Comment;
+  change: StatusChange | null;
 }
 
 export type FileFilter = 'all' | 'unreviewed' | 'needs_attention' | 'reviewed' | 'pinned' | 'commented' | 'excluded';
@@ -167,6 +177,8 @@ export interface NoteContext extends Comment {
   /** File in the current snapshot (0 for session notes or vanished paths). */
   fileId: number;
   fileStatus?: ReviewStatus;
+  changeType?: ChangeType;
+  oldPath?: string;
   excluded: boolean;
   hunkId: number;
   hunkHeader: string;

@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
+import { ClearButton } from '../../core/clear-button';
 import { ReviewStore } from '../../core/review-store';
 
 /** Edits the exclusion rules of the session. Every change is saved immediately. */
 @Component({
   selector: 'grb-exclusions-dialog',
-  imports: [FormsModule, Button, Dialog, InputText],
+  imports: [FormsModule, Button, Dialog, InputText, ClearButton],
   template: `
     <p-dialog header="Excluded files" [visible]="visible()" (visibleChange)="visible.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '60rem', maxWidth: '95vw', height: '80vh' }" [contentStyle]="{ display: 'flex', flexDirection: 'column', flex: '1', minHeight: '0' }">
       <p class="muted small help">
@@ -18,7 +19,10 @@ import { ReviewStore } from '../../core/review-store';
       </p>
 
       <form class="add" (ngSubmit)="add()">
-        <input pInputText name="rule" [(ngModel)]="draft" placeholder="Add a rule, e.g. *.lock or docs/" [fluid]="true" autocomplete="off" />
+        <div class="clearable rule-input">
+          <input pInputText name="rule" [(ngModel)]="draft" placeholder="Add a rule, e.g. *.lock or docs/" [fluid]="true" autocomplete="off" />
+          <grb-clear-button [visible]="!!draft" (cleared)="draft = ''" />
+        </div>
         <p-button type="submit" label="Add" icon="pi pi-plus" [disabled]="!draft.trim()" />
       </form>
 
@@ -61,6 +65,9 @@ import { ReviewStore } from '../../core/review-store';
     .add {
       display: flex;
       gap: 0.5rem;
+    }
+    .rule-input {
+      flex: 1;
     }
     .suggestions {
       display: flex;

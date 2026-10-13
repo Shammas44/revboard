@@ -11,14 +11,14 @@ import (
 func scanComment(row interface{ Scan(...any) error }) (Comment, error) {
 	var c Comment
 	var created, updated string
-	if err := row.Scan(&c.ID, &c.SessionID, &c.FilePath, &c.Side, &c.Line, &c.Body, &created, &updated); err != nil {
+	if err := row.Scan(&c.ID, &c.SessionID, &c.FilePath, &c.Side, &c.Line, &c.Body, &c.Export, &created, &updated); err != nil {
 		return c, err
 	}
 	c.CreatedAt, c.UpdatedAt = parseTime(created), parseTime(updated)
 	return c, nil
 }
 
-const commentColumns = `id, session_id, file_path, side, line, body, created_at, updated_at`
+const commentColumns = `id, session_id, file_path, side, line, body, export, created_at, updated_at`
 
 // listComments returns the notes of a session, optionally restricted to one file path.
 func listComments(ctx context.Context, q dbtx, sessionID int64, path *string) ([]Comment, error) {
@@ -66,24 +66,41 @@ func validateComment(c Comment) error {
 	return nil
 }
 
-// CreateComment adds a note to a session.
-func (s *Store) CreateComment(ctx context.Context, c Comment) (Comment, error) {
+// CreateComment adds a note to a session. The hunk holding a line note, or the
+// file of a file note, is marked "needs attention" in the same transaction.
+func (s *Store) CreateComment(ctx context.Context, c Comment) (NoteCreated, error) {
 	if err := validateComment(c); err != nil {
-		return Comment{}, err
+		return NoteCreated{}, err
 	}
 	if _, err := s.GetSession(ctx, c.SessionID); err != nil {
-		return Comment{}, err
+		return NoteCreated{}, err
 	}
-	res, err := s.db.ExecContext(ctx, `INSERT INTO comments(session_id, file_path, side, line, body) VALUES (?, ?, ?, ?, ?)`,
-		c.SessionID, c.FilePath, c.Side, c.Line, c.Body)
-	if err != nil {
-		return Comment{}, err
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return Comment{}, err
-	}
-	return s.getComment(ctx, id)
+	var out NoteCreated
+	err := s.tx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `INSERT INTO comments(session_id, file_path, side, line, body) VALUES (?, ?, ?, ?, ?)`,
+			c.SessionID, c.FilePath, c.Side, c.Line, c.Body)
+		if err != nil {
+			return err
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		if out.Comment, err = scanComment(tx.QueryRowContext(ctx, `SELECT `+commentColumns+` FROM comments WHERE id = ?`, id)); err != nil {
+			return err
+		}
+		fileID, err := flagForNote(ctx, tx, c)
+		if err != nil || fileID == 0 {
+			return err
+		}
+		if err := touchSessionTx(ctx, tx, c.SessionID); err != nil {
+			return err
+		}
+		sc, err := s.statusChange(ctx, tx, c.SessionID, []int64{fileID})
+		out.Change = &sc
+		return err
+	})
+	return out, err
 }
 
 func (s *Store) getComment(ctx context.Context, id int64) (Comment, error) {
@@ -94,19 +111,41 @@ func (s *Store) getComment(ctx context.Context, id int64) (Comment, error) {
 	return c, err
 }
 
-// UpdateComment changes the body of a note.
-func (s *Store) UpdateComment(ctx context.Context, id int64, body string) (Comment, error) {
-	if strings.TrimSpace(body) == "" {
-		return Comment{}, fmt.Errorf("note body cannot be empty: %w", ErrInvalid)
+// CommentPatch lists the note fields to update (nil = unchanged).
+type CommentPatch struct {
+	Body   *string
+	Export *bool
+}
+
+// UpdateComment changes the body and/or the export flag of a note.
+func (s *Store) UpdateComment(ctx context.Context, id int64, p CommentPatch) (Comment, error) {
+	var sets []string
+	var args []any
+	if p.Body != nil {
+		if strings.TrimSpace(*p.Body) == "" {
+			return Comment{}, fmt.Errorf("note body cannot be empty: %w", ErrInvalid)
+		}
+		sets, args = append(sets, "body = ?", "updated_at = "+now()), append(args, *p.Body)
 	}
-	res, err := s.db.ExecContext(ctx, `UPDATE comments SET body = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`, body, id)
-	if err != nil {
-		return Comment{}, err
+	if p.Export != nil {
+		sets, args = append(sets, "export = ?"), append(args, boolToInt(*p.Export))
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return Comment{}, notFound("note", id)
+	if len(sets) > 0 {
+		res, err := s.db.ExecContext(ctx, `UPDATE comments SET `+strings.Join(sets, ", ")+` WHERE id = ?`, append(args, id)...)
+		if err != nil {
+			return Comment{}, err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return Comment{}, notFound("note", id)
+		}
 	}
 	return s.getComment(ctx, id)
+}
+
+// SetCommentsExport sets the export flag of every note of a session.
+func (s *Store) SetCommentsExport(ctx context.Context, sessionID int64, export bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE comments SET export = ? WHERE session_id = ?`, boolToInt(export), sessionID)
+	return err
 }
 
 // DeleteComment removes a note.

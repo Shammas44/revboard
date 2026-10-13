@@ -134,9 +134,10 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("bulk status: %+v", sc.Progress)
 	}
 
-	var c store.Comment
+	var created store.NoteCreated
 	f.do("POST", "/api/sessions/"+itoa(f.session.ID)+"/comments",
-		map[string]any{"filePath": "src/app.go", "side": "new", "line": 3, "body": "check B"}, &c)
+		map[string]any{"filePath": "src/app.go", "side": "new", "line": 3, "body": "check B"}, &created)
+	c := created.Comment
 	f.do("PATCH", "/api/comments/"+itoa(c.ID), map[string]string{"body": "check B again"}, &c)
 	if c.Body != "check B again" {
 		t.Fatalf("comment not updated: %+v", c)

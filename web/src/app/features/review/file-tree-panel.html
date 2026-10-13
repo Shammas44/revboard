@@ -1,4 +1,5 @@
 <div class="tools">
+  <div class="clearable">
   <p-iconfield>
     <p-inputicon class="pi pi-search" />
     <input
@@ -13,6 +14,8 @@
       [fluid]="true"
     />
   </p-iconfield>
+  <grb-clear-button [visible]="!!store.search()" (cleared)="store.search.set('')" />
+  </div>
   <p-select
     [options]="filters"
     optionLabel="label"

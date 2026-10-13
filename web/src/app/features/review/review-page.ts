@@ -13,6 +13,7 @@ import { Tag } from 'primeng/tag';
 import { Tooltip } from 'primeng/tooltip';
 import { ReviewStore } from '../../core/review-store';
 import { DiffMode, ReviewStatus } from '../../core/models';
+import { ClearButton } from '../../core/clear-button';
 import { CommitsPanel } from './commits-panel';
 import { ExclusionsDialog } from './exclusions-dialog';
 import { NotesPanel } from './notes-panel';
@@ -41,6 +42,7 @@ interface Shortcut {
     Tag,
     Tooltip,
     Autofocus,
+    ClearButton,
     FileTreePanel,
     FileDiff,
     ExclusionsDialog,
@@ -244,9 +246,13 @@ export class ReviewPage {
     const file = s.selectedFile();
     const hunk = file?.hunks.find((h) => h.id === hunkId);
     if (hunk) {
+      const next = () => advance && s.moveHunk(1);
       // Already in that state (e.g. marked with the mouse): only move on.
-      if (hunk.status() !== status) s.setHunkStatus(hunk.id, status);
-      if (advance) s.moveHunk(1);
+      if (hunk.status() !== status) {
+        s.setHunkStatus(hunk.id, status, next);
+      } else {
+        next();
+      }
     } else if (file) {
       // Files without hunks (binary, renames) carry their status themselves.
       this.markFile(status, advance);
@@ -256,7 +262,6 @@ export class ReviewPage {
   private markFile(status: ReviewStatus, advance: boolean): void {
     const file = this.store.selectedFile();
     if (!file) return;
-    this.store.setFileStatus(file.id, status);
-    if (advance) this.store.moveFile(1);
+    this.store.setFileStatus(file.id, status, () => advance && this.store.moveFile(1));
   }
 }

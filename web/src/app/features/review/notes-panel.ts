@@ -10,6 +10,7 @@ import { catchError, debounceTime, map, of, switchMap } from 'rxjs';
 import { ApiService, errorMessage } from '../../core/api.service';
 import { DiffLine, NoteContext } from '../../core/models';
 import { ReviewStore } from '../../core/review-store';
+import { ClearButton } from '../../core/clear-button';
 import { NoteThread } from './note-thread';
 
 interface FileGroup {
@@ -27,19 +28,36 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
  */
 @Component({
   selector: 'grb-notes-panel',
-  imports: [FormsModule, Button, IconField, InputIcon, InputText, Tag, NoteThread],
+  imports: [FormsModule, Button, IconField, InputIcon, InputText, Tag, NoteThread, ClearButton],
   template: `
+    <div class="export-bar">
+      <span class="export-summary">
+        <i class="pi pi-file-export"></i>
+        Export <strong>{{ exportCount() }}</strong> of {{ store.comments().length }} note{{ store.comments().length === 1 ? '' : 's' }}
+      </span>
+      <p-button label="All" size="small" [text]="true" (onClick)="store.setAllNotesExport(true)" [disabled]="exportCount() === store.comments().length" />
+      <p-button label="None" size="small" [text]="true" (onClick)="store.setAllNotesExport(false)" [disabled]="exportCount() === 0" />
+      <p-button label="Copy as Markdown" icon="pi pi-copy" size="small" (onClick)="store.copyNotesExport()" [disabled]="exportCount() === 0" />
+    </div>
+    <p class="muted small export-help">
+      The export is a Markdown document listing the checked notes with their file, line and code context, ready to
+      paste into an LLM (or a pull request) to have the requested changes implemented.
+    </p>
+
     <section class="session-notes">
       <h3>Session notes</h3>
-      <grb-note-thread [notes]="store.sessionNotes()" [anchor]="{ filePath: '', side: '', line: 0 }" [alwaysCompose]="true" />
+      <grb-note-thread [notes]="store.sessionNotes()" [anchor]="{ filePath: '', side: '', line: 0 }" [alwaysCompose]="true" [exportable]="true" />
     </section>
 
     <div class="toolbar">
       <h3>File and line notes <span class="muted">({{ fileNoteCount() }})</span></h3>
-      <p-iconfield>
-        <p-inputicon class="pi pi-search" />
-        <input pInputText pSize="small" placeholder="Filter notes" [ngModel]="query()" (ngModelChange)="query.set($event)" />
-      </p-iconfield>
+      <div class="clearable">
+        <p-iconfield>
+          <p-inputicon class="pi pi-search" />
+          <input pInputText pSize="small" placeholder="Filter notes" [ngModel]="query()" (ngModelChange)="query.set($event)" />
+        </p-iconfield>
+        <grb-clear-button [visible]="!!query()" (cleared)="query.set('')" />
+      </div>
     </div>
 
     @if (state().error; as err) {
@@ -65,7 +83,7 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
           }
         </header>
         @for (n of g.notes; track n.id) {
-          <article class="note-card">
+          <article class="note-card" [class.not-exported]="!(commentById().get(n.id) ?? n).export">
             <div class="where small">
               @if (n.line === 0) {
                 <span class="muted">File note</span>
@@ -110,7 +128,7 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
               </table>
               </div>
             }
-            <grb-note-thread [notes]="[n]" [anchor]="{ filePath: n.filePath, side: n.side, line: n.line }" [allowReply]="false" />
+            <grb-note-thread [notes]="[commentById().get(n.id) ?? n]" [anchor]="{ filePath: n.filePath, side: n.side, line: n.line }" [allowReply]="false" [exportable]="true" />
           </article>
         }
       </section>
@@ -123,6 +141,33 @@ const SIGN: Record<DiffLine['kind'], string> = { context: ' ', add: '+', delete:
     h3 {
       font-size: 0.95rem;
       margin: 0 0 0.5rem;
+    }
+    .export-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.5rem;
+      padding: 0.5rem 0.6rem;
+      margin-bottom: 0.25rem;
+      border: 1px solid var(--p-content-border-color);
+      border-radius: 6px;
+      background: var(--p-content-background);
+    }
+    .export-summary {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .export-help {
+      margin: 0 0 1rem;
+    }
+    .note-card.not-exported table,
+    .note-card.not-exported .excerpt-head {
+      opacity: 0.55;
     }
     .session-notes {
       padding-bottom: 1rem;
@@ -296,6 +341,10 @@ export class NotesPanel {
       });
     });
   }
+
+  /** Live notes of the store (export marks update without waiting for a reload). */
+  protected readonly commentById = computed(() => new Map(this.store.comments().map((c) => [c.id, c])));
+  protected readonly exportCount = computed(() => this.store.comments().filter((c) => c.export).length);
 
   protected readonly fileNoteCount = computed(() => this.state().notes.filter((n) => n.filePath !== '').length);
 

@@ -16,6 +16,7 @@
           <span class="project">{{ session.projectName }}</span>
           <span class="sep">/</span>
           @if (nameDraft() !== null) {
+            <span class="clearable">
             <input
               pInputText
               pSize="small"
@@ -26,6 +27,8 @@
               (blur)="commitRename()"
               grbAutofocus
             />
+            <grb-clear-button [visible]="!!nameDraft()" (cleared)="nameDraft.set('')" />
+            </span>
           } @else {
             <span class="name" (dblclick)="startRename()">{{ session.name }}</span>
             <i class="pi pi-pencil rename" (click)="startRename()" pTooltip="Rename" tooltipPosition="left"></i>

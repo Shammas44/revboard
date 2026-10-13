@@ -64,6 +64,9 @@ database and serves a local web UI to work through it, across days and across pr
 | FR-14 | A session has **exclusion rules** (gitignore-like patterns, §8.5). Excluded files are hidden from the tree and the navigation and are not counted in the progress; their statuses, pins and notes are kept. Rules are managed with `revboard review exclude`, the toolbar dialog, or the "exclude" actions of a file or folder. |
 | FR-15 | The commits covered by a session (and the commits touching one file) can be inspected: hash, author, date, message, changed files. They are read live from git (§8.6). |
 | FR-16 | The diff can be displayed **unified** or **split** (side by side); the choice is persisted per session. |
+| FR-18 | Adding a line note marks its hunk *needs attention*; a file note marks its file *needs attention* (kept while the file note exists). Deleting a note does not change statuses. |
+| FR-19 | A reviewed hunk/file holds no note: marking reviewed an item with notes requires a confirmation and deletes its notes (hunk: line notes on its lines; file/folder: all notes of the files). The API refuses with `409 {noteCount}` unless `deleteNotes: true`. |
+| FR-20 | Each note has an *export* flag (default true). The checked notes are exported as Markdown for an LLM or a developer to implement them (UI *Copy as Markdown*, `review notes --markdown`, `GET /api/sessions/{id}/notes/export`). |
 | FR-17 | All notes can be retrieved in one place (UI *Notes* drawer, `revboard review notes [--markdown]`), each line note with its whole hunk (scrolled to the noted line, which is marked; the CLI prints `--context` lines around it, default 3); "go to line" opens the file, expands the hunk and highlights the line in the diff. |
 
 ## 5. Non-functional requirements
@@ -338,10 +341,21 @@ Design notes:
 ALTER TABLE review_sessions ADD COLUMN exclusions TEXT NOT NULL DEFAULT '[]';
 ```
 
+### 8.2.2 Migration 0003 — note export flag
+
+```sql
+-- Notes can be left out of the Markdown export (all notes are exported by default).
+ALTER TABLE comments ADD COLUMN export INTEGER NOT NULL DEFAULT 1;
+```
+
 ### 8.3 Status rules (enforced by the backend in a single transaction)
 - `PUT file status = S` → `UPDATE review_hunks SET status = S WHERE file_id = ?` and file status = `S`.
 - `PUT hunk status = S` → file status recomputed:
-  `needs_attention` if any hunk is `needs_attention`, else `reviewed` if all hunks are `reviewed`, else `unreviewed`.
+  `needs_attention` if any hunk is `needs_attention` **or the file has file notes**, else `reviewed` if all hunks are `reviewed`, else `unreviewed`.
+- Adding a note (same transaction): line note → the hunk containing the line becomes `needs_attention` (file recomputed);
+  file note → the file becomes `needs_attention`. Deleting a note changes nothing.
+- Marking `reviewed` deletes the notes of the item (hunk: line notes anchored on its lines; file: every note of the
+  path), only when the request carries `deleteNotes: true`; otherwise `409 {"noteCount": n}`.
 - Files without hunks (binary, pure rename, mode change) carry their status on the file row only.
 - The response of every status mutation returns the updated file (status + hunk refs) and the
   session progress, so the client can reconcile its optimistic update.
@@ -674,15 +688,17 @@ Base: `http://127.0.0.1:<port>/api`. JSON in/out. All requests require header
 | DELETE | `/api/sessions/{id}` | — | 204 | |
 | POST | `/api/sessions/{id}/refresh` | — | `SessionDetail` | re-runs git (§8.4) |
 | POST | `/api/sessions/{id}/status` | `{fileIds: number[], status}` | `StatusChange` | bulk (folder) |
+| GET | `/api/sessions/{id}/notes/export?all=1` | — | `text/markdown` | Markdown export of the notes marked for export (`all=1`: every note); header `X-Revboard-Notes` = count |
+| PUT | `/api/sessions/{id}/notes/export` | `{export}` | 204 | marks / unmarks every note |
 | GET | `/api/sessions/{id}/notes` | — | `NoteContext[]` | every note in diff order; line notes carry `fileId`, `hunkId`, `hunkHeader`, `hunkSection`, `excerpt` (all hunk lines, `focus` on the noted line) or `outdated` |
 | GET | `/api/sessions/{id}/commits?path=` | — | `CommitList` | live `git log` of the session range (§8.6), optionally for one file |
 | GET | `/api/sessions/{id}/comments` | — | `Comment[]` | all notes of the session |
-| POST | `/api/sessions/{id}/comments` | `{filePath, side, line, body}` | `Comment` | |
+| POST | `/api/sessions/{id}/comments` | `{filePath, side, line, body}` | `{comment, change}` | `change`: `StatusChange` of the hunk/file flagged *needs attention*, or null |
 | GET | `/api/files/{id}` | — | `FileDetail` | hunks with parsed lines + file comments |
-| PUT | `/api/files/{id}/status` | `{status}` | `StatusChange` | cascades to hunks |
+| PUT | `/api/files/{id}/status` | `{status, deleteNotes?}` | `StatusChange` | cascades to hunks; reviewed + notes → 409 unless `deleteNotes` |
 | PUT | `/api/files/{id}/pin` | `{pinned}` | `FileSummary` | |
-| PUT | `/api/hunks/{id}/status` | `{status}` | `StatusChange` | recomputes file |
-| PATCH | `/api/comments/{id}` | `{body}` | `Comment` | |
+| PUT | `/api/hunks/{id}/status` | `{status, deleteNotes?}` | `StatusChange` | recomputes file; reviewed + line notes → 409 unless `deleteNotes` |
+| PATCH | `/api/comments/{id}` | `{body?, export?}` | `Comment` | |
 | DELETE | `/api/comments/{id}` | — | 204 | |
 | GET | `/*` (non-API) | — | SPA asset or `index.html` | client-side routing fallback |
 
