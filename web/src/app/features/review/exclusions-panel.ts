@@ -1,17 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, inject, model } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Button } from 'primeng/button';
-import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
 import { ClearButton } from '../../core/clear-button';
 import { ReviewStore } from '../../core/review-store';
 
-/** Edits the exclusion rules of the session. Every change is saved immediately. */
+/** Edits the exclusion rules of the session (right drawer). Every change is saved immediately. */
 @Component({
-  selector: 'grb-exclusions-dialog',
-  imports: [FormsModule, Button, Dialog, InputText, ClearButton],
+  selector: 'grb-exclusions-panel',
+  imports: [FormsModule, Button, InputText, ClearButton],
   template: `
-    <p-dialog header="Excluded files" [visible]="visible()" (visibleChange)="visible.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '60rem', maxWidth: '95vw', height: '80vh' }" [contentStyle]="{ display: 'flex', flexDirection: 'column', flex: '1', minHeight: '0' }">
+    <div class="panel">
       <p class="muted small help">
         Excluded files are hidden from the tree and do not count in the progress. Their statuses and notes are kept.
         Rules: <code>*.md</code> (name at any depth), <code>docs/</code> (folder), <code>src/gen/</code> (path from root),
@@ -55,9 +54,21 @@ import { ReviewStore } from '../../core/review-store';
           <a href="" (click)="showExcluded($event)">Show them</a>
         }
       </div>
-    </p-dialog>
+    </div>
   `,
   styles: `
+    :host {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
     .help {
       margin-top: 0;
       line-height: 1.5;
@@ -119,10 +130,11 @@ import { ReviewStore } from '../../core/review-store';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ExclusionsDialog {
+export class ExclusionsPanel {
   protected readonly store = inject(ReviewStore);
 
-  readonly visible = model(false);
+  /** Emitted when the panel asks to be closed (e.g. "Show them"). */
+  readonly closed = output<void>();
   protected draft = '';
 
   protected readonly rules = computed(() => this.store.session()?.exclusions ?? []);
@@ -159,6 +171,6 @@ export class ExclusionsDialog {
   protected showExcluded(event: Event): void {
     event.preventDefault();
     this.store.filter.set('excluded');
-    this.visible.set(false);
+    this.closed.emit();
   }
 }

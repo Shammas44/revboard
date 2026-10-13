@@ -116,7 +116,7 @@
   </p-splitter>
 }
 
-<p-dialog header="Keyboard shortcuts" [visible]="showHelp()" (visibleChange)="showHelp.set($event)" [modal]="true" [dismissableMask]="true" [style]="{ width: '32rem' }">
+<p-drawer [visible]="showHelp()" (visibleChange)="showHelp.set($event)" position="right" header="Keyboard shortcuts" [style]="drawerStyle" styleClass="grb-drawer">
   <table class="shortcuts">
     @for (s of shortcuts; track s.keys) {
       <tr>
@@ -125,28 +125,34 @@
       </tr>
     }
   </table>
-</p-dialog>
+</p-drawer>
 
 <p-drawer
   [visible]="showNotes()"
   (visibleChange)="showNotes.set($event)"
   position="right"
   header="Notes"
-  [style]="{ width: '46rem', maxWidth: '95vw' }"
+  [style]="drawerStyle"
+  styleClass="grb-drawer"
 >
   @if (showNotes()) {
     <grb-notes-panel (navigated)="showNotes.set(false)" />
   }
 </p-drawer>
 
-<grb-exclusions-dialog [visible]="showExclusions()" (visibleChange)="showExclusions.set($event)" />
+<p-drawer [visible]="showExclusions()" (visibleChange)="showExclusions.set($event)" position="right" header="Excluded files" [style]="drawerStyle" styleClass="grb-drawer">
+  @if (showExclusions()) {
+    <grb-exclusions-panel (closed)="showExclusions.set(false)" />
+  }
+</p-drawer>
 
 <p-drawer
   [visible]="store.commitsView() !== null"
   (visibleChange)="!$event && store.commitsView.set(null)"
   position="right"
   [header]="store.commitsView()?.path ? 'File history' : 'Commits'"
-  [style]="{ width: '40rem', maxWidth: '95vw' }"
+  [style]="drawerStyle"
+  styleClass="grb-drawer"
 >
   @if (store.commitsView(); as view) {
     <grb-commits-panel

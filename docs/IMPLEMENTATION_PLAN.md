@@ -39,7 +39,7 @@ Go and can be developed without Node.js thanks to a placeholder UI.
 - `angular.json` output path → `../internal/webui/dist`; `proxy.conf.json` for `ng serve` → Go API.
 - `core/`: models, `ApiService` (+ `X-GRB-Client` interceptor), `ReviewStore`, tree builder (keyboard shortcuts are handled by `ReviewPage`).
 - `features/dashboard`: projects & sessions tables.
-- `features/review`: toolbar, file tree (CDK virtual scroll + pinned), file diff, hunk, hunk lines, note thread, shortcuts dialog.
+- `features/review`: toolbar, file tree (CDK virtual scroll + pinned), file diff, hunk, hunk lines, note thread; right drawers for notes, commits, exclusions and shortcuts.
 - **Done when**: `ng build` succeeds, the bundle is embedded, and a session can be reviewed end-to-end in the browser.
 
 ## Phase 6 — Hardening & docs

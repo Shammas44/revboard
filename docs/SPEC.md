@@ -61,7 +61,7 @@ database and serves a local web UI to work through it, across days and across pr
 | FR-11 | `revboard project list` / `switch` / `rename` / `remove` manage projects; `revboard review list` / `archive` / `delete` manage sessions; `revboard status` prints progress. |
 | FR-12 | Every command supports `--help` with examples. |
 | FR-13 | A session can be renamed (`revboard review rename`, toolbar title, dashboard). |
-| FR-14 | A session has **exclusion rules** (gitignore-like patterns, §8.5). Excluded files are hidden from the tree and the navigation and are not counted in the progress; their statuses, pins and notes are kept. Rules are managed with `revboard review exclude`, the toolbar dialog, or the "exclude" actions of a file or folder. |
+| FR-14 | A session has **exclusion rules** (gitignore-like patterns, §8.5). Excluded files are hidden from the tree and the navigation and are not counted in the progress; their statuses, pins and notes are kept. Rules are managed with `revboard review exclude`, the *Excluded files* right drawer, or the "exclude" actions of a file or folder. |
 | FR-15 | The commits covered by a session (and the commits touching one file) can be inspected: hash, author, date, message, changed files. They are read live from git (§8.6). |
 | FR-16 | The diff can be displayed **unified** or **split** (side by side); the choice is persisted per session. |
 | FR-18 | Adding a line note marks its hunk *needs attention*; a file note marks its file *needs attention* (kept while the file note exists). Deleting a note does not change statuses. |
@@ -715,12 +715,14 @@ flow `@if/@for`), PrimeNG 22 with the Aura theme (`@primeuix/themes`), PrimeIcon
 - `/` — Dashboard: projects (PrimeNG `Table`), their sessions with progress bars, open / archive / delete.
 - `/sessions/:id` — Review workspace: toolbar (progress, refresh, notes, help), left `Splitter`
   pane with search + filter (`Select`) + pinned list + file tree, right pane with the file diff.
+  Notes, commits, excluded files and keyboard shortcuts open in right drawers of a common size
+  (`min(1200px, 85vw)`); text inputs have a clear (×) button once they contain text.
 
 The file tree is **not** PrimeNG `Tree`: it is a flattened row list (`buildTree` → `flattenTree`,
 single-child directory chains compressed) rendered with `@angular/cdk` virtual scrolling at a fixed
 row height. Only the ~50 visible rows exist in the DOM even for 5 000 files, keyboard navigation
 follows the exact same order as the rows, and each row reads only its own file's status signal.
-All other widgets (Splitter, Table, Button, Tag, ProgressBar, Select, ToggleSwitch, Dialog,
+All other widgets (Splitter, Table, Button, Tag, ProgressBar, Select, SelectButton, Drawer, Dialog (dashboard),
 ConfirmDialog, Toast, Tooltip, Textarea, InputText) are PrimeNG.
 
 ### 11.3 Store (`ReviewStore`, one instance per review page)
@@ -808,9 +810,9 @@ Measured on a 3 000-file / 9 000-hunk diff (headless Chromium): capture 0.4 s, s
 | `z` | toggle "collapse reviewed hunks" |
 | `v` | switch unified / split diff |
 | `l` / `L` | commits of the review / commits touching the current file |
-| `e` | excluded files dialog |
+| `e` | excluded files (right drawer) |
 | `/` | focus file search |
-| `?` | show shortcut help |
+| `?` | shortcut help (right drawer) |
 
 ## 12. Error handling
 

@@ -540,22 +540,24 @@ table.diff {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.4rem;
-    height: 1.4rem;
+    width: 1.25rem;
+    height: 1.25rem;
     padding: 0;
     border: none;
     border-radius: 50%;
-    background: transparent;
-    color: var(--p-text-muted-color);
+    background: var(--p-text-muted-color);
+    color: var(--p-content-background);
     cursor: pointer;
+    opacity: 0.75;
 
     .pi {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
+      font-weight: 700;
     }
 
     &:hover {
-      background: var(--p-content-hover-background);
-      color: var(--p-text-color);
+      opacity: 1;
+      background: var(--p-text-color);
     }
   }
 
@@ -586,4 +588,10 @@ table.diff {
 
 .session-name .clearable {
   display: inline-block;
+}
+
+/* ---- Right drawers (notes, commits, exclusions, shortcuts) ---- */
+.grb-drawer .p-drawer-content {
+  display: flex;
+  flex-direction: column;
 }

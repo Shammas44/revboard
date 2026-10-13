@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import { Button } from 'primeng/button';
-import { Dialog } from 'primeng/dialog';
 import { Drawer } from 'primeng/drawer';
 import { InputText } from 'primeng/inputtext';
 import { ProgressBar } from 'primeng/progressbar';
@@ -15,7 +14,7 @@ import { ReviewStore } from '../../core/review-store';
 import { DiffMode, ReviewStatus } from '../../core/models';
 import { ClearButton } from '../../core/clear-button';
 import { CommitsPanel } from './commits-panel';
-import { ExclusionsDialog } from './exclusions-dialog';
+import { ExclusionsPanel } from './exclusions-panel';
 import { NotesPanel } from './notes-panel';
 import { FileDiff } from './file-diff';
 import { FileTreePanel } from './file-tree-panel';
@@ -33,7 +32,6 @@ interface Shortcut {
     RouterLink,
     FormsModule,
     Button,
-    Dialog,
     Drawer,
     InputText,
     ProgressBar,
@@ -45,7 +43,7 @@ interface Shortcut {
     ClearButton,
     FileTreePanel,
     FileDiff,
-    ExclusionsDialog,
+    ExclusionsPanel,
     NotesPanel,
     CommitsPanel,
   ],
@@ -65,6 +63,8 @@ export class ReviewPage {
   readonly showHelp = signal(false);
   readonly showNotes = signal(false);
   readonly showExclusions = signal(false);
+  /** Common size of the right drawers (notes, commits, exclusions, shortcuts). */
+  readonly drawerStyle = { width: 'min(1200px, 85vw)' };
   /** Session name being edited, or null. */
   readonly nameDraft = signal<string | null>(null);
 
