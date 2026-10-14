@@ -136,7 +136,7 @@ sequenceDiagram
     CLI->>P: Parse(stdout)
     P-->>CLI: Diff AST
     CLI->>DB: TX: upsert project, insert session, files, hunks
-    CLI->>S: listen 127.0.0.1:0
+    CLI->>S: listen 127.0.0.1:4444 (or $REVBOARD_PORT)
     CLI->>Dev: open http://127.0.0.1:PORT/sessions/42
     UI->>S: GET /api/sessions/42
     UI->>S: GET /api/files/{id} (lazy, on selection)
@@ -173,6 +173,7 @@ Global (persistent) flags:
 |---|---|---|---|
 | `--db <path>` | `REVBOARD_DB` | `$XDG_CONFIG_HOME/revboard/revboard.db` or `~/.config/revboard/revboard.db` | Database file |
 | `-P, --project <name\|id>` | — | current project | Project context for commands that need one |
+| `--port <n>` (server commands) | `REVBOARD_PORT` | `4444` | Web server port (`0` = any free port); flag > env > default |
 
 ```
 revboard
@@ -832,7 +833,7 @@ Measured on a 3 000-file / 9 000-hunk diff (headless Chromium): capture 0.4 s, s
 | Git exits non-zero | Error shows git's stderr verbatim; nothing stored. |
 | Empty diff | `error: the diff is empty, nothing to review`; nothing stored. |
 | Combined diff | `error: combined diffs (merge commits) are not supported; diff against a parent instead` |
-| Port in use (explicit `--port`) | Error; default port `0` lets the OS choose. |
+| Port in use | Default port (4444): falls back to a free port with a warning. Port chosen with `--port` or `REVBOARD_PORT`: error. |
 | Browser cannot be opened | Warning; URL still printed. |
 | UI request fails | Optimistic state rolled back; PrimeNG toast with the server message. |
 

@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"revboard/internal/browser"
+	"revboard/internal/config"
 	"revboard/internal/server"
 	"revboard/internal/store"
 )
@@ -80,14 +81,55 @@ type serveOptions struct {
 
 func (o *serveOptions) register(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.addr, "addr", "127.0.0.1", "loopback address to listen on")
-	cmd.Flags().IntVar(&o.port, "port", 0, "port to listen on (0 = pick a free port)")
+	cmd.Flags().IntVar(&o.port, "port", config.DefaultPort,
+		"port to listen on, overrides $"+config.EnvPort+" (0 = any free port)")
 	cmd.Flags().BoolVar(&o.noOpen, "no-open", false, "do not open the browser")
 }
 
 // serve starts the web server, opens the browser on urlPath and blocks until
 // Ctrl+C is pressed.
+// resolvePort returns the port to listen on: the --port flag when given, else
+// $REVBOARD_PORT, else the default port. explicit is false for the default,
+// which may be replaced by a free port when it is busy.
+func resolvePort(flagSet bool, flagPort int, env string) (port int, explicit bool, err error) {
+	switch {
+	case flagSet:
+		port, explicit = flagPort, true
+	case env != "":
+		p, err := strconv.Atoi(strings.TrimSpace(env))
+		if err != nil {
+			return 0, false, usageError{fmt.Errorf("invalid %s=%q: expected a port number", config.EnvPort, env)}
+		}
+		port, explicit = p, true
+	default:
+		return config.DefaultPort, false, nil
+	}
+	if port < 0 || port > 65535 {
+		return 0, false, usageError{fmt.Errorf("invalid port %d: expected 0-65535", port)}
+	}
+	return port, explicit, nil
+}
+
+// listen opens the server socket. A busy default port falls back to a free
+// port (with a warning); a port chosen by the user must be available.
+func listen(addr string, port int, explicit bool, warn io.Writer) (net.Listener, error) {
+	ln, err := server.Listen(net.JoinHostPort(addr, strconv.Itoa(port)))
+	if err == nil || !errors.Is(err, syscall.EADDRINUSE) {
+		return ln, err
+	}
+	if explicit {
+		return nil, fmt.Errorf("port %d is already in use (another \"revboard serve\"?); stop it or choose another port with --port or %s", port, config.EnvPort)
+	}
+	fmt.Fprintf(warn, "warning: port %d is already in use (another \"revboard serve\"?); using a free port instead\n", port)
+	return server.Listen(net.JoinHostPort(addr, "0"))
+}
+
 func (a *app) serve(cmd *cobra.Command, st *store.Store, o serveOptions, urlPath string) error {
-	ln, err := server.Listen(net.JoinHostPort(o.addr, strconv.Itoa(o.port)))
+	port, explicit, err := resolvePort(cmd.Flags().Changed("port"), o.port, os.Getenv(config.EnvPort))
+	if err != nil {
+		return err
+	}
+	ln, err := listen(o.addr, port, explicit, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}

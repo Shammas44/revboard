@@ -10,6 +10,12 @@ import (
 // EnvDB is the environment variable overriding the database path.
 const EnvDB = "REVBOARD_DB"
 
+// EnvPort is the environment variable overriding the web server port.
+const EnvPort = "REVBOARD_PORT"
+
+// DefaultPort is the web server port used when none is configured.
+const DefaultPort = 4444
+
 // DefaultDBPath returns the database path: $REVBOARD_DB, else
 // $XDG_CONFIG_HOME/revboard/revboard.db, else ~/.config/revboard/revboard.db.
 func DefaultDBPath() (string, error) {

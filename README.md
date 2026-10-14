@@ -114,9 +114,14 @@ revboard version
 
 | Flag | Description |
 |---|---|
-| `--port <n>` | Port to listen on (default `0`: a free port is picked) |
+| `--port <n>` | Port to listen on (default `$REVBOARD_PORT`, else `4444`; `0` = any free port) |
 | `--addr <ip>` | Loopback address (default `127.0.0.1`; non-loopback addresses are refused) |
 | `--no-open` | Do not open the browser, just print the URL |
+
+The server listens on **port 4444** by default, so the UI keeps the same address
+(`http://127.0.0.1:4444`). Set `REVBOARD_PORT` (e.g. in your shell profile) to use another port;
+`--port` overrides both. If the default port is already taken (another `revboard serve`), a free
+port is used and a warning is printed; a port you chose yourself must be available.
 
 `review start` also accepts `--name/-n` (session name) and `--no-serve` (create the session only).
 
