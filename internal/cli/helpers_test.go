@@ -59,3 +59,20 @@ func TestListenFallsBackOnlyForTheDefaultPort(t *testing.T) {
 		t.Fatalf("explicit busy port should fail, got %v", err)
 	}
 }
+
+func TestProgressBarCountsAttentionAsDone(t *testing.T) {
+	cases := []struct {
+		u    progressUnits
+		want string
+	}{
+		{progressUnits{0, 0, 0}, "[··········]   -"},
+		{progressUnits{5, 0, 10}, "[█████·····]  50%"},
+		{progressUnits{6, 4, 10}, "[██████▒▒▒▒] 100%"},
+		{progressUnits{3, 2, 10}, "[███▒▒·····]  50%"},
+	}
+	for _, c := range cases {
+		if got := progressBar(c.u, 10); got != c.want {
+			t.Errorf("progressBar(%+v) = %q, want %q", c.u, got, c.want)
+		}
+	}
+}

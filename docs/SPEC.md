@@ -369,6 +369,9 @@ ALTER TABLE review_sessions ADD COLUMN next_note_number INTEGER NOT NULL DEFAULT
 - Files without hunks (binary, pure rename, mode change) carry their status on the file row only.
 - The response of every status mutation returns the updated file (status + hunk refs) and the
   session progress, so the client can reconcile its optimistic update.
+- **Progress**: the units are the hunks, plus the files without hunks. A unit is *done* when it is `reviewed`
+  **or** `needs_attention` (read and acknowledged); percent = (reviewed + attention) / total. Bars draw two
+  segments: reviewed (green, `█` in the CLI) and needs attention (orange, `▒`).
 
 ### 8.4 Refresh carry-over algorithm
 In one transaction:

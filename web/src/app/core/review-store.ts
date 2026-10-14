@@ -23,6 +23,7 @@ import {
   StatusChange,
   UiState,
 } from './models';
+import { ProgressUnits, progressPercent } from './review-progress';
 import { aggregateStatus } from './status';
 
 /** A queued server write with the function restoring the previous local state. */
@@ -213,23 +214,30 @@ export class ReviewStore {
     return p;
   });
 
-  /** Review progress in percent; files without hunks count as one unit. */
-  readonly percent = computed(() => {
-    let done = 0;
-    let total = 0;
+  /**
+   * Review progress units: every hunk, plus files without hunks. Reviewed and
+   * "needs attention" units both count as done (the attention ones are seen
+   * and acknowledged, just not approved).
+   */
+  readonly progressUnits = computed<ProgressUnits>(() => {
+    const u: ProgressUnits = { reviewed: 0, attention: 0, total: 0 };
+    const count = (s: ReviewStatus) => {
+      u.total++;
+      if (s === 'reviewed') u.reviewed++;
+      if (s === 'needs_attention') u.attention++;
+    };
     for (const f of this.includedFiles()) {
       if (f.hunks.length === 0) {
-        total++;
-        if (f.status() === 'reviewed') done++;
+        count(f.status());
       } else {
-        for (const h of f.hunks) {
-          total++;
-          if (h.status() === 'reviewed') done++;
-        }
+        for (const h of f.hunks) count(h.status());
       }
     }
-    return total === 0 ? 0 : Math.floor((done * 100) / total);
+    return u;
   });
+
+  /** Review progress in percent (reviewed or flagged units). */
+  readonly percent = computed(() => progressPercent(this.progressUnits()));
 
   /* ---- Lazily loaded diff of the selected file ---- */
   private readonly detailCache = new Map<number, FileDetail>();
@@ -511,18 +519,20 @@ export class ReviewStore {
     this.selectFile(order[next].id);
   }
 
-  /** Jumps to the next file that is not reviewed (wrapping around). */
+  /** Jumps to the next file with hunks neither reviewed nor flagged (wrapping around). */
   nextUnreviewedFile(): void {
     const order = this.fileOrder();
     const start = order.findIndex((f) => f.id === this.selectedFileId());
+    const pending = (f: (typeof order)[number]) =>
+      f.hunks.length === 0 ? f.status() === 'unreviewed' : f.hunks.some((h) => h.status() === 'unreviewed');
     for (let k = 1; k <= order.length; k++) {
       const f = order[(start + k + order.length) % order.length];
-      if (f.status() !== 'reviewed') {
+      if (pending(f)) {
         this.selectFile(f.id);
         return;
       }
     }
-    this.toast.add({ severity: 'success', summary: 'All done', detail: 'Every file of this review is reviewed.' });
+    this.toast.add({ severity: 'success', summary: 'All done', detail: 'Every hunk of this review is reviewed or flagged.' });
   }
 
   /** Moves the active hunk, crossing file boundaries. */

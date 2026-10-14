@@ -42,16 +42,15 @@
     </div>
 
     <div class="topbar-progress">
-      <p-progressbar [value]="store.percent()" [showValue]="false" styleClass="thin" />
-      <div class="small">
+      @let u = store.progressUnits();
+      <grb-review-progress [units]="u" />
+      <div class="small" [title]="p.reviewedFiles + '/' + p.totalFiles + ' files reviewed' + (p.excludedFiles ? ' · ' + p.excludedFiles + ' excluded' : '')">
         <strong>{{ store.percent() }}%</strong>
-        <span class="muted"> · {{ p.reviewedHunks }}/{{ p.totalHunks }} hunks · {{ p.reviewedFiles }}/{{ p.totalFiles }} files</span>
-        @if (p.attentionFiles > 0) {
-          <span class="attention"> · <i class="pi pi-flag-fill"></i> {{ p.attentionFiles }} need attention</span>
-        }
-        @if (p.excludedFiles > 0) {
-          <span class="muted"> · {{ p.excludedFiles }} excluded</span>
-        }
+        <span class="muted"> · <span class="reviewed">{{ u.reviewed }} reviewed</span>
+          @if (u.attention > 0) {
+            · <span class="attention"><i class="pi pi-flag-fill"></i> {{ u.attention }} need attention</span>
+          }
+          · {{ u.total - u.reviewed - u.attention }} left</span>
       </div>
     </div>
 

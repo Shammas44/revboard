@@ -6,7 +6,6 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { Button } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
-import { ProgressBar } from 'primeng/progressbar';
 import { TableModule } from 'primeng/table';
 import { Tag } from 'primeng/tag';
 import { ToggleSwitch } from 'primeng/toggleswitch';
@@ -15,6 +14,7 @@ import { forkJoin, map, of, switchMap } from 'rxjs';
 import { ApiService, errorMessage } from '../../core/api.service';
 import { ClearButton } from '../../core/clear-button';
 import { Project, Session } from '../../core/models';
+import { ProgressUnits, ReviewProgress, progressPercent } from '../../core/review-progress';
 
 interface ProjectGroup {
   project: Project;
@@ -24,7 +24,7 @@ interface ProjectGroup {
 /** Lists every project with its review sessions. */
 @Component({
   selector: 'grb-dashboard',
-  imports: [RouterLink, FormsModule, DatePipe, Button, ClearButton, Dialog, InputText, ProgressBar, TableModule, Tag, ToggleSwitch, Tooltip],
+  imports: [RouterLink, FormsModule, DatePipe, Button, ClearButton, Dialog, InputText, ReviewProgress, TableModule, Tag, ToggleSwitch, Tooltip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -80,13 +80,16 @@ export class Dashboard {
     this.reload();
   }
 
-  percent(s: Session): number {
+  /** Progress units of a session: hunks when it has any, files otherwise. */
+  units(s: Session): ProgressUnits {
     const p = s.progress;
     return p.totalHunks > 0
-      ? Math.floor((p.reviewedHunks * 100) / p.totalHunks)
-      : p.totalFiles > 0
-        ? Math.floor((p.reviewedFiles * 100) / p.totalFiles)
-        : 0;
+      ? { reviewed: p.reviewedHunks, attention: p.attentionHunks, total: p.totalHunks }
+      : { reviewed: p.reviewedFiles, attention: p.attentionFiles, total: p.totalFiles };
+  }
+
+  percent(s: Session): number {
+    return progressPercent(this.units(s));
   }
 
   command(s: Session): string {

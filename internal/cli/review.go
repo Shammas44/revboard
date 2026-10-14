@@ -36,13 +36,17 @@ func newReviewCmd(a *app) *cobra.Command {
 	return cmd
 }
 
-// reviewProgress returns the done/total units shown in progress bars:
-// hunks when the session has any, files otherwise.
-func reviewProgress(p store.Progress) (int, int) {
+// progressUnits are the units shown in progress bars. Units needing
+// attention count as done: they were read and acknowledged.
+type progressUnits struct{ reviewed, attention, total int }
+
+// reviewProgress returns the progress units of a session: hunks when it has
+// any, files otherwise.
+func reviewProgress(p store.Progress) progressUnits {
 	if p.TotalHunks > 0 {
-		return p.ReviewedHunks, p.TotalHunks
+		return progressUnits{p.ReviewedHunks, p.AttentionHunks, p.TotalHunks}
 	}
-	return p.ReviewedFiles, p.TotalFiles
+	return progressUnits{p.ReviewedFiles, p.AttentionFiles, p.TotalFiles}
 }
 
 func newReviewStartCmd(a *app) *cobra.Command {
@@ -184,9 +188,9 @@ func newReviewListCmd(a *app) *cobra.Command {
 			tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(tw, "ID\tPROJECT\tNAME\tPROGRESS\tATTENTION\tFILES\tLAST OPENED\tSTATE")
 			for _, se := range sessions {
-				done, total := reviewProgress(se.Progress)
+				units := reviewProgress(se.Progress)
 				fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%d\t%d\t%s\t%s\n", se.ID, se.ProjectName, se.Name,
-					progressBar(done, total, 10), se.Progress.AttentionHunks, se.Progress.TotalFiles,
+					progressBar(units, 10), se.Progress.AttentionHunks, se.Progress.TotalFiles,
 					ago(se.LastOpenedAt), se.State)
 			}
 			return tw.Flush()

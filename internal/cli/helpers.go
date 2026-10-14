@@ -159,13 +159,17 @@ func confirm(cmd *cobra.Command, question string) bool {
 	return answer == "y" || answer == "yes"
 }
 
-// progressBar renders a fixed-width textual progress bar.
-func progressBar(done, total, width int) string {
-	if total == 0 {
+// progressBar renders a fixed-width textual progress bar: "█" for reviewed
+// units, "▒" for units needing attention. Both count as done in the percentage.
+func progressBar(u progressUnits, width int) string {
+	if u.total == 0 {
 		return "[" + strings.Repeat("·", width) + "]   -"
 	}
-	filled := done * width / total
-	return fmt.Sprintf("[%s%s] %3d%%", strings.Repeat("█", filled), strings.Repeat("·", width-filled), done*100/total)
+	done := u.reviewed + u.attention
+	filled := done * width / u.total
+	flagged := min(filled, u.attention*width/u.total)
+	return fmt.Sprintf("[%s%s%s] %3d%%", strings.Repeat("█", filled-flagged), strings.Repeat("▒", flagged),
+		strings.Repeat("·", width-filled), done*100/u.total)
 }
 
 // ago renders a duration in a compact human form.

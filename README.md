@@ -161,13 +161,18 @@ working directory.
 Status rules: setting a file's status applies it to all its hunks; a file is *Reviewed* when all its
 hunks are, and *Needs attention* as soon as one hunk is.
 
+Progress counts hunks (and files without hunks). A hunk is *done* once it is either *Reviewed* or
+flagged *Needs attention*: 100 % means every change was read and every issue acknowledged, not that
+nothing needs fixing. The progress bar shows reviewed hunks in green and flagged hunks in orange; in
+the CLI they are `█` and `▒`.
+
 ### Keyboard shortcuts
 
 | Key | Action |
 |---|---|
 | `j` / `k` | Next / previous hunk (continues into the next/previous file) |
 | `n` / `p` | Next / previous file |
-| `u` | Jump to the next file that is not reviewed |
+| `u` | Jump to the next file with hunks neither reviewed nor flagged |
 | `r` | Mark hunk reviewed **and move to the next one** |
 | `a` | Mark hunk "needs attention" |
 | `x` | Reset hunk |

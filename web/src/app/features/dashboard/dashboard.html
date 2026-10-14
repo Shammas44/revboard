@@ -64,12 +64,12 @@
                 <div class="muted mono small">{{ command(s) }}</div>
               </td>
               <td>
-                <p-progressbar [value]="percent(s)" [showValue]="false" styleClass="thin" />
-                <span class="small muted">{{ percent(s) }}% · {{ s.progress.reviewedHunks }}/{{ s.progress.totalHunks }} hunks</span>
+                <grb-review-progress [units]="units(s)" />
+                <span class="small muted">{{ percent(s) }}% · {{ s.progress.reviewedHunks }}/{{ s.progress.totalHunks }} hunks reviewed</span>
               </td>
               <td>
-                @if (s.progress.attentionFiles > 0) {
-                  <p-tag [value]="s.progress.attentionFiles + ' files'" severity="warn" icon="pi pi-flag" />
+                @if (s.progress.attentionHunks > 0 || s.progress.attentionFiles > 0) {
+                  <p-tag [value]="s.progress.attentionHunks + ' hunks · ' + s.progress.attentionFiles + ' files'" severity="warn" icon="pi pi-flag" />
                 }
               </td>
               <td>{{ s.progress.totalFiles }}</td>

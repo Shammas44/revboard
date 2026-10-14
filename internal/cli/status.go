@@ -39,10 +39,10 @@ func newStatusCmd(a *app) *cobra.Command {
 					marker = ">" // resumed by "revboard review resume"
 				}
 				pr := se.Progress
-				done, total := reviewProgress(pr)
+				units := reviewProgress(pr)
 				fmt.Fprintf(out, "\n%s #%d %s  (%s)\n", marker, se.ID, se.Name, ago(se.LastOpenedAt))
 				fmt.Fprintf(out, "    %s\n", quoteArgs(se.GitArgs))
-				fmt.Fprintf(out, "    %s  %d/%d files reviewed", progressBar(done, total, 20), pr.ReviewedFiles, pr.TotalFiles)
+				fmt.Fprintf(out, "    %s  %d/%d files reviewed", progressBar(units, 20), pr.ReviewedFiles, pr.TotalFiles)
 				if pr.AttentionFiles > 0 {
 					fmt.Fprintf(out, " · %d need attention", pr.AttentionFiles)
 				}

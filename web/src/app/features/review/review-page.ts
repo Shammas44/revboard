@@ -5,13 +5,13 @@ import { RouterLink } from '@angular/router';
 import { Button } from 'primeng/button';
 import { Drawer } from 'primeng/drawer';
 import { InputText } from 'primeng/inputtext';
-import { ProgressBar } from 'primeng/progressbar';
 import { SelectButton } from 'primeng/selectbutton';
 import { Splitter } from 'primeng/splitter';
 import { Tag } from 'primeng/tag';
 import { Tooltip } from 'primeng/tooltip';
 import { ReviewStore } from '../../core/review-store';
 import { DiffMode, ReviewStatus } from '../../core/models';
+import { ReviewProgress } from '../../core/review-progress';
 import { ClearButton } from '../../core/clear-button';
 import { CommitsPanel } from './commits-panel';
 import { ExclusionsPanel } from './exclusions-panel';
@@ -34,7 +34,7 @@ interface Shortcut {
     Button,
     Drawer,
     InputText,
-    ProgressBar,
+    ReviewProgress,
     SelectButton,
     Splitter,
     Tag,
@@ -97,7 +97,7 @@ export class ReviewPage {
   readonly shortcuts: Shortcut[] = [
     { keys: 'j / k', action: 'Next / previous hunk (crosses files)' },
     { keys: 'n / p', action: 'Next / previous file' },
-    { keys: 'u', action: 'Next file that is not reviewed' },
+    { keys: 'u', action: 'Next file with hunks left to review' },
     { keys: 'r', action: 'Mark hunk reviewed and go to the next one' },
     { keys: 'a', action: 'Mark hunk "needs attention"' },
     { keys: 'x', action: 'Reset hunk to unreviewed' },
