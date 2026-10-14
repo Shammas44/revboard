@@ -1,4 +1,4 @@
-import { ChangeType, ReviewStatus } from './models';
+import { ChangeType, FileVM, ReviewStatus } from './models';
 
 /** Derives a file status from its hunk statuses (same rule as the Go backend). */
 export function aggregateStatus(statuses: readonly ReviewStatus[]): ReviewStatus {
@@ -12,6 +12,15 @@ export function aggregateStatus(statuses: readonly ReviewStatus[]): ReviewStatus
     }
   }
   return reviewed === statuses.length ? 'reviewed' : 'unreviewed';
+}
+
+/**
+ * Whether a file still has something to review: an unreviewed hunk, or an
+ * unreviewed status for files without hunks. Flagged hunks are not pending:
+ * they were read and acknowledged (same rule as the progress percentage).
+ */
+export function hasPendingWork(f: FileVM): boolean {
+  return f.hunks.length === 0 ? f.status() === 'unreviewed' : f.hunks.some((h) => h.status() === 'unreviewed');
 }
 
 export const STATUS_ICON: Record<ReviewStatus, string> = {

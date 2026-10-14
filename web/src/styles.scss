@@ -24,6 +24,11 @@
   --hl-builtin: #953800;
   --hl-comment: #6e7781;
   --hl-tag: #116329;
+
+  div#p-license-host {
+    display:none !important;
+  }
+
 }
 
 @media (prefers-color-scheme: dark) {

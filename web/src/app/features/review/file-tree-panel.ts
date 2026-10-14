@@ -10,7 +10,7 @@ import { ClearButton } from '../../core/clear-button';
 import { fileName, TreeRow } from '../../core/file-tree';
 import { FileFilter, FileVM, ReviewStatus } from '../../core/models';
 import { ReviewStore } from '../../core/review-store';
-import { CHANGE_LETTER, STATUS_ICON, STATUS_LABEL } from '../../core/status';
+import { CHANGE_LETTER, STATUS_ICON, STATUS_LABEL, hasPendingWork } from '../../core/status';
 
 /** Height of one tree row in px (fixed, required by the virtual scroll). */
 const ROW_HEIGHT = 28;
@@ -71,10 +71,13 @@ export class FileTreePanel {
     return row.key;
   }
 
-  /** Number of reviewed files below a directory (reads the status signals of those files only). */
+  /**
+   * Number of files below a directory with nothing left to review (all hunks
+   * reviewed or flagged); reads the status signals of those files only.
+   */
   protected doneCount(files: readonly FileVM[]): number {
     let n = 0;
-    for (const f of files) if (f.status() === 'reviewed') n++;
+    for (const f of files) if (!hasPendingWork(f)) n++;
     return n;
   }
 

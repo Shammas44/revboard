@@ -24,7 +24,7 @@ import {
   UiState,
 } from './models';
 import { ProgressUnits, progressPercent } from './review-progress';
-import { aggregateStatus } from './status';
+import { aggregateStatus, hasPendingWork } from './status';
 
 /** A queued server write with the function restoring the previous local state. */
 interface Write {
@@ -173,6 +173,8 @@ export class ReviewStore {
         const byPath = this.commentsByPath();
         return files.filter((f) => byPath.has(f.summary.path));
       }
+      case 'unreviewed':
+        return files.filter(hasPendingWork);
       default:
         return files.filter((f) => f.status() === filter);
     }
@@ -523,11 +525,9 @@ export class ReviewStore {
   nextUnreviewedFile(): void {
     const order = this.fileOrder();
     const start = order.findIndex((f) => f.id === this.selectedFileId());
-    const pending = (f: (typeof order)[number]) =>
-      f.hunks.length === 0 ? f.status() === 'unreviewed' : f.hunks.some((h) => h.status() === 'unreviewed');
     for (let k = 1; k <= order.length; k++) {
       const f = order[(start + k + order.length) % order.length];
-      if (pending(f)) {
+      if (hasPendingWork(f)) {
         this.selectFile(f.id);
         return;
       }
